@@ -12378,6 +12378,54 @@ result
         let loadedPresets = [];
         let currentPresetIndex = -1;
 
+        // Phase 5-1: フォントパースを Worker に逃がす (importScripts 形式の classic worker)
+        // 失敗時は同期 FontEngine3D.parse() に静かにフォールバック
+        let _fontWorker = null;        // null=未試行, false=失敗, Worker=利用可
+        let _fontWorkerCallId = 0;
+        const _fontPending = new Map();
+        function _ensureFontWorker() {
+            if (_fontWorker !== null) return _fontWorker;
+            try {
+                _fontWorker = new Worker('./workers/font-parse-worker.js'); // classic worker (importScripts)
+                _fontWorker.onmessage = (e) => {
+                    const data = e.data || {};
+                    if (data.ready) return;
+                    const p = _fontPending.get(data.id);
+                    if (!p) return;
+                    _fontPending.delete(data.id);
+                    if (!data.ok) { p.reject(new Error(data.error || 'Font parse worker failed')); return; }
+                    p.resolve(data.json);
+                };
+                _fontWorker.onerror = (ev) => {
+                    console.warn('Font worker error, falling back to sync parse:', ev && (ev.message || ev.filename) || ev);
+                    for (const p of _fontPending.values()) p.reject(new Error('Font worker error'));
+                    _fontPending.clear();
+                    try { _fontWorker.terminate(); } catch (e) { /* ignore */ }
+                    _fontWorker = false;
+                };
+            } catch (err) {
+                console.warn('Font worker init failed, using sync parse:', err);
+                _fontWorker = false;
+            }
+            return _fontWorker;
+        }
+        function parseFontAsync(buffer) {
+            const w = _ensureFontWorker();
+            if (w === false) {
+                try {
+                    return Promise.resolve(FontEngine3D.parse(buffer));
+                } catch (e) { return Promise.reject(e); }
+            }
+            return new Promise((resolve, reject) => {
+                const id = ++_fontWorkerCallId;
+                _fontPending.set(id, { resolve, reject });
+                // ArrayBuffer は transferable で渡してコピー回避
+                const bufClone = buffer instanceof ArrayBuffer ? buffer.slice(0) : buffer;
+                w.postMessage({ id, type: 'parse', buffer: bufClone }, [bufClone]);
+            });
+        }
+        if (typeof window !== 'undefined') window.parseFontAsync = parseFontAsync;
+
         const paramMap = {
             'u-size': 'uSize', 'wall-thick': 'wallThickness', 'rib-shorten': 'ribShorten', 'top-scale': 'topScale',
             'stem-clearance': 'stemClearance', 'font-size': 'fontSize', 'text-height': 'textHeight',
