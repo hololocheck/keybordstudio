@@ -30,6 +30,11 @@ export { PROFILE_INFO, ROW_INFO, MATERIAL_PRESETS, ENGRAVE_DEPTH_PRESETS, STEM_T
 export { lerp, clamp, deg2rad, rad2deg, hexToRgb, rgbToHex, colorDiff,
          pointInRect, pointInCircle, estimateWeightGrams, estimateCostUSD,
          deepClone, shallowDiff } from './keycap-helpers.js';
+// Phase 13-C: state-pure な計算ヘルパー
+export { computeKeycapBaseDim, computeKeycapHeight, computeKeycapVolume,
+         computeKeycapWeight, computeKeycapCost, computeSafeArea,
+         estimatePrintTimeSec, computeFaceDimensions, aggregateBatchEstimate
+       } from './keycap-render.js';
 
 const MODULE_ID = 'keycap';
 const MODULE_NAME = 'Keycap Studio';

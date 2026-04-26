@@ -2272,7 +2272,11 @@ var FontEngine3D = (() => {
                 totalMapped: charCodes.length,
                 type: formatStr,
                 // Phase 11: fvar テーブル軸情報を実際にパース
-                variableAxes: parseFvarAxes(reader, tables['fvar'])
+                variableAxes: parseFvarAxes(reader, tables['fvar']),
+                // Phase 13-A: HarfBuzz が利用可能な場合に shape 用に元 ArrayBuffer を保持。
+                // createTextShapes(options.fontBuffer 未指定) でも自動的に shape できる。
+                // メモリ的には font 読込済の間だけ保持されるので大きな悪影響なし。
+                sourceBuffer: arrayBuffer
             }
         };
 
@@ -2414,8 +2418,10 @@ ${paths}</svg>`;
         // shape できなければ通常の単純レイアウトに fallback。
         let shaped = null;
         const wantShaping = options.useShaping !== false; // デフォルト ON
-        if (wantShaping && options.fontBuffer && typeof window !== 'undefined' && window._harfbuzzInstance) {
-            try { shaped = shapeText(typefaceJSON, text, options.fontBuffer); } catch (e) { shaped = null; }
+        // Phase 13-A: options.fontBuffer 未指定なら parse 時に保持された sourceBuffer を自動使用
+        const fontBuf = options.fontBuffer || (data && data._meta && data._meta.sourceBuffer) || null;
+        if (wantShaping && fontBuf && typeof window !== 'undefined' && window._harfbuzzInstance) {
+            try { shaped = shapeText(typefaceJSON, text, fontBuf); } catch (e) { shaped = null; }
         }
         if (shaped && Array.isArray(shaped) && shaped.length > 0) {
             // HarfBuzz は glyph ID ベースで結果を返す。typefaceJSON は char → glyph の
