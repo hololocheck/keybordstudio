@@ -6456,6 +6456,79 @@
                 height: 40px !important;
             }
         }
+
+        /* ===========================================================
+         * Large-display & ultrawide responsive layer (V1.1)
+         * 既存の max-width 系メディアクエリはタブレット/小型ノート向け。
+         * 以下は FHD/4K/ウルトラワイドで「余白だらけ」「文字が小さすぎ」になる
+         * 問題を解消するための追加レイヤー。--sidebar-width / 文字スケール /
+         * キャンバス最大幅 を段階的に引き上げる。
+         * =========================================================== */
+
+        /* Tablet — タッチ操作時のみ、ボタン最小サイズを確保 */
+        @media (pointer: coarse) and (min-width: 768px) {
+            button, .custom-option, .layout-preset-btn, .mount-option {
+                min-height: 36px;
+            }
+        }
+
+        /* Full HD (1920px〜) */
+        @media screen and (min-width: 1920px) {
+            :root {
+                --sidebar-width: 440px;
+            }
+            body {
+                font-size: 15px;
+            }
+        }
+
+        /* QHD / 4K入口 (2560px〜) */
+        @media screen and (min-width: 2560px) {
+            :root {
+                --sidebar-width: 500px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .layers-list, .layout-canvas-container {
+                font-size: 0.85rem;
+            }
+        }
+
+        /* True 4K (3840px〜) */
+        @media screen and (min-width: 3840px) {
+            :root {
+                --sidebar-width: 560px;
+            }
+            body {
+                font-size: 18px;
+            }
+            #canvas-container,
+            #layout-canvas-container {
+                /* キャンバスが横方向にだけ伸びすぎるのを抑制し中央寄せ */
+                max-width: calc(100vw - var(--sidebar-width));
+            }
+        }
+
+        /* Ultrawide 21:9 (例: 3440x1440) — 横幅は広いが縦は控えめ
+         * 余白を作って中央寄せし、3D 操作の視野を引き締める */
+        @media (min-aspect-ratio: 21/9) and (min-width: 3000px) {
+            #canvas-container,
+            #layout-canvas-container {
+                width: min(calc(100% - var(--sidebar-width)), 2400px);
+            }
+        }
+
+        /* Super Ultrawide 32:9 (例: 5120x1440 / 5760x1080) */
+        @media (min-aspect-ratio: 32/9) {
+            :root {
+                --sidebar-width: 600px;
+            }
+            #canvas-container,
+            #layout-canvas-container {
+                width: min(calc(100% - var(--sidebar-width)), 2800px);
+            }
+        }
     </style>
 
     <script src="https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js"></script>
@@ -12362,10 +12435,38 @@ result
         // V68: テキストジオメトリ生成（ハイブリッド）
         // 既存JSONフォント → TextGeometry（Three.jsネイティブ・高品質カーブ）
         // カスタムフォント(TTF/OTF/WOFF) → FontEngine3D（独自パース＋事前テッセレーション）
+        //
+        // V1.1: 同一パラメータでの再構築を避けるため LRU キャッシュを導入。
+        //  - サイズ／深さスライダーをドラッグして同じ値に戻ったときに即時ヒット
+        //  - 日本語漢字テキストの ExtrudeGeometry は単独で 50–150ms 級の重さがあるので、
+        //    キャッシュヒット時はそれを丸ごとスキップできる
+        //  - ジオメトリは clone して返し、利用側で破棄しても元キャッシュは生存させる
+        const _textGeoCache = new Map();
+        const _TEXT_GEO_CACHE_MAX = 24;
+        function _textGeoCacheKey(text, fontName, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize) {
+            return text + '' + fontName + '' + size + '' + height + '' + curveSegments + '' + (bevelEnabled ? 1 : 0) + '' + (bevelThickness || 0) + '' + (bevelSize || 0);
+        }
+        function _textGeoCacheTouch(key, geo) {
+            if (_textGeoCache.has(key)) _textGeoCache.delete(key);
+            _textGeoCache.set(key, geo);
+            while (_textGeoCache.size > _TEXT_GEO_CACHE_MAX) {
+                const oldestKey = _textGeoCache.keys().next().value;
+                const oldestGeo = _textGeoCache.get(oldestKey);
+                _textGeoCache.delete(oldestKey);
+                if (oldestGeo && oldestGeo.dispose) oldestGeo.dispose();
+            }
+        }
         function makeTextGeo(text, fontName, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize) {
             curveSegments = curveSegments || 12;
             const data = loadedFontData[fontName];
             if (!data) return null;
+
+            const cacheKey = _textGeoCacheKey(text, fontName, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize);
+            const cached = _textGeoCache.get(cacheKey);
+            if (cached) {
+                _textGeoCacheTouch(cacheKey, cached);
+                return cached.clone();
+            }
 
             if (data._meta) {
                 // Custom font parsed by FontEngine3D → use engine's createTextShapes
@@ -12374,7 +12475,7 @@ result
                     size: size, curveSegments: curveSegments
                 });
                 if (!shapes || shapes.length === 0) return null;
-                return new THREE.ExtrudeGeometry(shapes, {
+                const geo = new THREE.ExtrudeGeometry(shapes, {
                     depth: height,
                     curveSegments: 1,
                     bevelEnabled: !!bevelEnabled,
@@ -12382,12 +12483,14 @@ result
                     bevelSize: bevelSize || 0,
                     bevelSegments: 1
                 });
+                _textGeoCacheTouch(cacheKey, geo);
+                return geo.clone();
             } else {
                 // Built-in JSON typeface → TextGeometry (native smooth curves)
                 const font = loadedFonts[fontName];
                 if (font) {
                     try {
-                        return new TextGeometry(text, {
+                        const geo = new TextGeometry(text, {
                             font: font,
                             size: size,
                             height: height,
@@ -12397,6 +12500,8 @@ result
                             bevelSize: bevelSize || 0,
                             bevelSegments: 1
                         });
+                        _textGeoCacheTouch(cacheKey, geo);
+                        return geo.clone();
                     } catch (e) {
                         console.warn('TextGeometry failed:', e);
                     }
@@ -12406,7 +12511,7 @@ result
                     size: size, curveSegments: curveSegments
                 });
                 if (!shapes || shapes.length === 0) return null;
-                return new THREE.ExtrudeGeometry(shapes, {
+                const geo = new THREE.ExtrudeGeometry(shapes, {
                     depth: height,
                     curveSegments: 1,
                     bevelEnabled: !!bevelEnabled,
@@ -12414,6 +12519,8 @@ result
                     bevelSize: bevelSize || 0,
                     bevelSegments: 1
                 });
+                _textGeoCacheTouch(cacheKey, geo);
+                return geo.clone();
             }
         }
 

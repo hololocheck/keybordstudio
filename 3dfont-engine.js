@@ -850,6 +850,10 @@ var FontEngine3D = (() => {
     // 'glyf' table - TrueType Glyph outlines
     // =========================================================================
     function parseGlyfTable(reader, glyfTable, locaOffsets, numGlyphs) {
+        // 旧仕様では全グリフを事前パースしていたが、日本語フォント等で
+        // numGlyphs が 1万を超える場合に強烈な UI フリーズを引き起こすため廃止。
+        // parseGlyph は内部キャッシュ（glyphsCache）を持ち、composite glyph も
+        // 参照時に再帰的に解決できるため、空グリフ以外は遅延でも整合性は保たれる。
         const glyphs = new Array(numGlyphs);
         for (let i = 0; i < numGlyphs; i++) {
             const offset = locaOffsets[i];
@@ -858,14 +862,7 @@ var FontEngine3D = (() => {
                 // Empty glyph (e.g. space)
                 glyphs[i] = { contours: [], xMin: 0, yMin: 0, xMax: 0, yMax: 0 };
             } else {
-                glyphs[i] = null; // parse lazily or mark for parsing
-            }
-        }
-
-        // Parse all glyphs (needed for composite glyph resolution)
-        for (let i = 0; i < numGlyphs; i++) {
-            if (glyphs[i] === null) {
-                glyphs[i] = parseGlyph(reader, glyfTable.offset, locaOffsets, i, glyphs);
+                glyphs[i] = null; // 遅延：実際にアクセスされた時に parseGlyph
             }
         }
         return glyphs;
@@ -2039,10 +2036,15 @@ var FontEngine3D = (() => {
         // Build glyphs
         let glyphOutlines;
         let cffData;
+        let _glyfOffset = 0;
+        let _locaOffsets = null;
 
         if (isTrueType) {
-            const loca = parseLoca(reader, tables['loca'], maxp.numGlyphs, head.indexToLocFormat);
-            glyphOutlines = parseGlyfTable(reader, tables['glyf'], loca, maxp.numGlyphs);
+            _locaOffsets = parseLoca(reader, tables['loca'], maxp.numGlyphs, head.indexToLocFormat);
+            _glyfOffset = tables['glyf'].offset;
+            // parseGlyfTable は中で全グリフを事前パースしないようになった（V1.1）。
+            // 戻り値は空グリフを除いて null で埋まり、参照時に parseGlyph で解決する。
+            glyphOutlines = parseGlyfTable(reader, tables['glyf'], _locaOffsets, maxp.numGlyphs);
         } else if (isCFF2) {
             cffData = parseCFF(reader, tables['CFF2'], true);
         } else {
@@ -2064,7 +2066,6 @@ var FontEngine3D = (() => {
             // CFF/CFF2 は executeCharString が重く、フォント全グリフ（数千個）を
             // パース時に展開すると OTF 読み込みで UI が数秒凍結する。
             // → CFF 系は実際に glyph.o が参照された瞬間に評価する遅延ゲッターを用いる。
-            // TrueType は contour 情報が既にパース済みで安価なので従来通り即時評価。
             if (!isTrueType && cffData && glyphId < cffData.charStringsIndex.data.length) {
                 const _charString = cffData.charStringsIndex.data[glyphId];
                 let _fdIdx = 0;
@@ -2103,30 +2104,54 @@ var FontEngine3D = (() => {
                 continue;
             }
 
-            // TrueType eager path
-            let commandStr = '';
-            try {
-                if (isTrueType) {
-                    const glyph = glyphOutlines[glyphId];
-                    if (glyph && glyph.contours && glyph.contours.length > 0) {
-                        const parts = [];
-                        for (const contour of glyph.contours) {
-                            const cmd = ttContourToCommands(contour);
-                            if (cmd) parts.push(cmd);
+            // TrueType も日本語フォント (numGlyphs > 10000) で読み込みフリーズの主因となる。
+            // → glyf table の事前展開を撤廃し、ttContourToCommands も参照時まで遅延。
+            if (isTrueType && glyphOutlines && glyphId < glyphOutlines.length) {
+                const _gid = glyphId;
+                const _r = reader;
+                const _go = _glyfOffset;
+                const _lo = _locaOffsets;
+                const _cache = glyphOutlines;
+
+                const lazyGlyph = { ha: advanceWidth };
+                Object.defineProperty(lazyGlyph, 'o', {
+                    configurable: true,
+                    enumerable: true,
+                    get() {
+                        let path = '';
+                        try {
+                            let g = _cache[_gid];
+                            if (!g || g.contours === undefined) {
+                                g = parseGlyph(_r, _go, _lo, _gid, _cache);
+                                _cache[_gid] = g;
+                            }
+                            if (g && g.contours && g.contours.length > 0) {
+                                const parts = [];
+                                for (const contour of g.contours) {
+                                    const cmd = ttContourToCommands(contour);
+                                    if (cmd) parts.push(cmd);
+                                }
+                                path = parts.join(' ');
+                            }
+                        } catch (e) {
+                            path = '';
                         }
-                        commandStr = parts.join(' ');
+                        Object.defineProperty(this, 'o', {
+                            value: path,
+                            writable: true,
+                            enumerable: true,
+                            configurable: true
+                        });
+                        return path;
                     }
-                }
+                });
+                glyphs[char] = lazyGlyph;
                 convertedCount++;
-            } catch (e) {
-                errorCount++;
-                commandStr = '';
+                continue;
             }
 
-            glyphs[char] = {
-                ha: advanceWidth,
-                o: commandStr
-            };
+            // どちらの形式でもない／glyphId が範囲外の場合のフォールバック
+            glyphs[char] = { ha: advanceWidth, o: '' };
         }
 
         // Build kerning map (char → char → value)
@@ -2353,7 +2378,11 @@ ${paths}</svg>`;
         const subPaths = _parsePathString(pathStr, scale);
         if (subPaths.length === 0) return { outers: [] };
 
-        const areaDiv = Math.max(divisions, 48);
+        // 旧: areaDiv = max(divisions, 48) で常時48分割していた。
+        // 漢字グリフは subPaths が30〜50個におよび、48分割×全curve で
+        // 1グリフあたり数千頂点 → ExtrudeGeometry / CSG 双方が重くなる主因だった。
+        // 24分割でも符号検出と穴判定は実用上問題なく、トライアングル数を約半減できる。
+        const areaDiv = Math.max(divisions, 24);
         const subPathData = subPaths.map(sp => {
             const pts = _tessellate(sp, areaDiv);
             const area = _signedArea(pts);
