@@ -2711,10 +2711,19 @@ function bindUI() {
         'body-bottom-text': 'bottomText',
         'body-bottom-side-text': 'bottomSideText',
     };
+    // IME 入力中はテキスト確定までパイプラインを動かさない（漢字変換時のカクツキ対策）。
     Object.entries(textInputMap).forEach(([id, prop]) => {
         const el = document.getElementById(id);
         if (!el) return;
+        let _bodyComposing = false;
+        el.addEventListener('compositionstart', () => { _bodyComposing = true; });
+        el.addEventListener('compositionend', () => {
+            _bodyComposing = false;
+            state[prop] = el.value;
+            requestBodyUpdateDebounced(300);
+        });
         el.addEventListener('input', () => {
+            if (_bodyComposing) return;
             state[prop] = el.value;
             requestBodyUpdateDebounced(300);
         });
