@@ -12235,6 +12235,79 @@ result
             _csgCacheTouch(key, out);
             return out.clone();
         }
+
+        // CSG Web Worker — three-bvh-csg をメインスレッド外で動かして UI を止めない。
+        // 失敗時は同期フォールバック (_csgWorker = false で印付け)。
+        // 連続更新は呼出側 (updateModel) の myUpdateId vs _currentUpdateId で破棄判定。
+        let _csgWorker = null;          // null=未試行, false=失敗, Worker=利用可
+        let _csgWorkerCallId = 0;
+        const _csgPending = new Map();
+        function _ensureCsgWorker() {
+            if (_csgWorker !== null) return _csgWorker;
+            try {
+                _csgWorker = new Worker('./workers/csg-worker.js', { type: 'module' });
+                _csgWorker.onmessage = (e) => {
+                    const data = e.data || {};
+                    if (data.ready) return;
+                    const p = _csgPending.get(data.id);
+                    if (!p) return;
+                    _csgPending.delete(data.id);
+                    if (!data.ok) { p.reject(new Error(data.error || 'CSG worker failed')); return; }
+                    const g = data.g;
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+                    if (g.normal) geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+                    if (g.index) geo.setIndex(new THREE.BufferAttribute(g.index, 1));
+                    geo.computeBoundingBox();
+                    p.resolve(geo);
+                };
+                _csgWorker.onerror = (ev) => {
+                    console.warn('CSG worker error, falling back to sync CSG:', ev && (ev.message || ev.filename) || ev);
+                    for (const p of _csgPending.values()) p.reject(new Error('Worker error'));
+                    _csgPending.clear();
+                    try { _csgWorker.terminate(); } catch (e) { /* ignore */ }
+                    _csgWorker = false;
+                };
+            } catch (err) {
+                console.warn('CSG worker init failed, using sync CSG:', err);
+                _csgWorker = false;
+            }
+            return _csgWorker;
+        }
+        function _serializeGeoForWorker(g) {
+            const pos = g.attributes.position.array;
+            const out = { position: new Float32Array(pos), normal: null, index: null };
+            if (g.attributes.normal) out.normal = new Float32Array(g.attributes.normal.array);
+            if (g.index) {
+                const idx = g.index.array;
+                out.index = idx.constructor === Uint16Array ? new Uint16Array(idx) : new Uint32Array(idx);
+            }
+            return out;
+        }
+        function _csgSubtractAsync(aGeo, bGeo) {
+            const w = _ensureCsgWorker();
+            if (w === false) {
+                // 同期フォールバック（main thread で評価）
+                try {
+                    const b1 = new Brush(aGeo); b1.updateMatrixWorld();
+                    const b2 = new Brush(bGeo); b2.updateMatrixWorld();
+                    const res = csgEvaluator.evaluate(b1, b2, SUBTRACTION);
+                    return Promise.resolve(res.geometry);
+                } catch (e) { return Promise.reject(e); }
+            }
+            return new Promise((resolve, reject) => {
+                const id = ++_csgWorkerCallId;
+                _csgPending.set(id, { resolve, reject });
+                const aData = _serializeGeoForWorker(aGeo);
+                const bData = _serializeGeoForWorker(bGeo);
+                const transfer = [aData.position.buffer, bData.position.buffer];
+                if (aData.normal) transfer.push(aData.normal.buffer);
+                if (bData.normal) transfer.push(bData.normal.buffer);
+                if (aData.index) transfer.push(aData.index.buffer);
+                if (bData.index) transfer.push(bData.index.buffer);
+                w.postMessage({ id, op: 'sub', a: aData, b: bData }, transfer);
+            });
+        }
         const history = [JSON.parse(JSON.stringify(initialState))];
         let historyIndex = 0;
         let loadedPresets = [];
@@ -18044,9 +18117,13 @@ ${componentsXml}      </components>
         //   opts.light=false … フル品質。本来のジオメトリを CSG で生成。
         // ユーザーは入力直後に light で即座にフィードバックを得て、操作を止めると 220ms 後に
         // heavy 版へ自動的に置換される（詳細は requestUpdate 参照）。
+        // 連続更新時に「古い CSG 結果が遅れて到着して新状態を上書きする」のを防ぐためのカウンタ
+        let _currentUpdateId = 0;
+
         function updateModel(opts) {
             opts = opts || {};
             const light = !!opts.light;
+            const _myUpdateId = ++_currentUpdateId;
             mainGroup.rotation.x = THREE.MathUtils.degToRad(state.globalRotX);
             mainGroup.rotation.y = THREE.MathUtils.degToRad(state.globalRotY);
             const p = getParams();
@@ -18125,13 +18202,32 @@ ${componentsXml}      </components>
             // Engrave 用 CSG はパイプラインで最も重い箇所。light モードでは実行せず、
             // 暫定的に半透明オーバーレイで「文字位置と大きさ」だけ示す。
             // 操作停止後の heavy update で正式な凹み形状に置き換わる。
+            //
+            // heavy モード: キャッシュヒット時は同期適用、ミス時は Web Worker に投げて
+            // CSG 前のジオメトリで先にメッシュを構築 → 完了後 mainGroup の Mesh を差し替える。
             let _lightEngravePreview = null;
+            let _pendingCsgSubtract = null;
             if (finalEngraveGeo && finalKeycapGeo) {
                 if (light) {
                     _lightEngravePreview = finalEngraveGeo;
                     finalEngraveGeo = null;
                 } else {
-                    finalKeycapGeo = _csgCachedSubtract(finalKeycapGeo, finalEngraveGeo);
+                    const _csgKey = 'sub|' + _geoQuickHash(finalKeycapGeo) + '|' + _geoQuickHash(finalEngraveGeo);
+                    const _csgHit = _csgCache.get(_csgKey);
+                    if (_csgHit) {
+                        // 同期パス: キャッシュヒット → そのまま適用
+                        _csgCacheTouch(_csgKey, _csgHit);
+                        finalKeycapGeo = _csgHit.clone();
+                    } else {
+                        // 非同期パス: Worker に CSG を投げ、CSG 前の base 形状で先にメッシュを作成
+                        // 結果到着後に mainGroup 内の "KeycapBody" の geometry だけ差し替える
+                        _pendingCsgSubtract = {
+                            base: finalKeycapGeo,
+                            engrave: finalEngraveGeo,
+                            cacheKey: _csgKey
+                        };
+                        // この時点では CSG 前の base が表示される（数百ms 後に真の形状に切り替わる）
+                    }
                 }
             }
 
@@ -18166,6 +18262,39 @@ ${componentsXml}      </components>
                 const lightMesh = new THREE.Mesh(_lightEngravePreview, lightMat);
                 lightMesh.name = "KeycapEngrave-preview";
                 mainGroup.add(lightMesh);
+            }
+
+            // 非同期 CSG: Worker に減算を依頼し、結果が来たら KeycapBody の geometry を差し替える
+            if (_pendingCsgSubtract) {
+                const { base, engrave, cacheKey } = _pendingCsgSubtract;
+                _csgSubtractAsync(base, engrave).then(resultGeo => {
+                    // 古い update の結果が遅れて到着した場合は破棄（最新の updateModel が優先）
+                    if (_myUpdateId !== _currentUpdateId) {
+                        if (resultGeo && resultGeo.dispose) resultGeo.dispose();
+                        return;
+                    }
+                    _csgCacheTouch(cacheKey, resultGeo);
+                    const oldMesh = mainGroup.getObjectByName('KeycapBody');
+                    if (oldMesh) {
+                        if (oldMesh.geometry && oldMesh.geometry.dispose) oldMesh.geometry.dispose();
+                        const cloned = resultGeo.clone();
+                        cloned.computeVertexNormals();
+                        oldMesh.geometry = cloned;
+                    }
+                }).catch(err => {
+                    if (_myUpdateId !== _currentUpdateId) return;
+                    // Worker 経路で失敗 → 同期で再実行（最後の砦）
+                    console.warn('CSG worker subtract failed, retrying sync:', err && err.message || err);
+                    try {
+                        const result = _csgCachedSubtract(base, engrave);
+                        const oldMesh = mainGroup.getObjectByName('KeycapBody');
+                        if (oldMesh) {
+                            if (oldMesh.geometry && oldMesh.geometry.dispose) oldMesh.geometry.dispose();
+                            result.computeVertexNormals();
+                            oldMesh.geometry = result;
+                        }
+                    } catch (e) { /* ignore */ }
+                });
             }
 
             // V67: ガムボール再アタッチ（ドラッグ中はスキップ）
