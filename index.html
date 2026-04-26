@@ -6458,126 +6458,6 @@
         }
 
         /* ===========================================================
-         * Phase 6-2: Advanced Mode Toggle
-         * 基本/詳細モード — 上級者向けのセクション (画像テクスチャ・Utility・
-         * 外部モデル・断面ビュー) を OFF 時に折りたたむ。
-         * =========================================================== */
-        #advanced-mode-row {
-            padding: 4px 0;
-            display: flex;
-            justify-content: flex-end;
-        }
-        .adv-toggle {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            user-select: none;
-            padding: 4px 6px;
-            font-size: 0.72rem;
-            color: #888;
-        }
-        .adv-toggle input { display: none; }
-        .adv-track {
-            width: 28px; height: 14px;
-            background: #2a2a3e;
-            border-radius: 7px;
-            position: relative;
-            transition: background 0.15s;
-            display: inline-block;
-        }
-        .adv-thumb {
-            position: absolute;
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            background: #888;
-            top: 2px; left: 2px;
-            transition: all 0.15s;
-        }
-        .adv-toggle input:checked + .adv-track { background: var(--accent); }
-        .adv-toggle input:checked + .adv-track .adv-thumb {
-            left: 16px;
-            background: #fff;
-            box-shadow: 0 0 4px rgba(0,229,255,0.5);
-        }
-        .adv-toggle input:checked ~ .adv-text { color: var(--accent); }
-
-        /* ===========================================================
-         * Phase 6-1: Workflow Guide
-         * 制作フロー誘導: Layout → Body → Keycap → Export
-         * =========================================================== */
-        #workflow-guide {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 4px;
-            width: 100%;
-            padding: 6px 4px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            border: 1px solid #2a2a3e;
-            box-sizing: border-box;
-        }
-        .wf-step {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            padding: 6px 4px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid transparent;
-            color: #888;
-            font-size: 0.7rem;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .wf-step:hover {
-            background: rgba(0, 229, 255, 0.08);
-            color: #b2ebf2;
-        }
-        .wf-step.wf-active {
-            background: linear-gradient(135deg, rgba(0,229,255,0.18), rgba(0,229,255,0.08));
-            border-color: var(--accent);
-            color: var(--accent);
-            font-weight: bold;
-            box-shadow: 0 0 8px rgba(0,229,255,0.25);
-        }
-        .wf-step.wf-done {
-            color: #69f0ae;
-            border-color: rgba(105,240,174,0.3);
-            background: rgba(105,240,174,0.08);
-        }
-        .wf-step.wf-done .wf-num::before {
-            content: '✓';
-            margin-right: 2px;
-        }
-        .wf-step.wf-todo {
-            color: #555;
-        }
-        .wf-num {
-            display: inline-block;
-            min-width: 12px;
-            font-weight: bold;
-            opacity: 0.85;
-        }
-        .wf-arrow {
-            color: #444;
-            font-size: 0.85rem;
-            user-select: none;
-            flex-shrink: 0;
-        }
-        @media (max-width: 1024px) {
-            .wf-label { display: none; }
-            .wf-arrow { font-size: 0.7rem; }
-            .wf-step { padding: 6px 2px; min-width: 28px; }
-        }
-
-        /* ===========================================================
          * Large-display & ultrawide responsive layer (V1.1)
          * 既存の max-width 系メディアクエリはタブレット/小型ノート向け。
          * 以下は FHD/4K/ウルトラワイドで「余白だらけ」「文字が小さすぎ」になる
@@ -6650,58 +6530,6 @@
             }
         }
 
-        /* ===========================================================
-         * Phase 6-3: Quick Action Bar
-         * 3 Studio 共通: Keycap/Body/Layout どこからでも同じ位置で
-         * クイック保存 (.kbsproj) / 現モジュール出力 / 製造前チェック にアクセス。
-         * =========================================================== */
-        #qa-bar {
-            position: fixed; bottom: 20px; right: 20px;
-            display: flex; flex-direction: column; gap: 8px;
-            padding: 8px;
-            background: rgba(15, 15, 25, 0.78);
-            border: 1px solid rgba(0, 229, 255, 0.35);
-            border-radius: 30px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            z-index: 50;
-        }
-        .qa-button {
-            width: 44px; height: 44px;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(0, 229, 255, 0.25);
-            border-radius: 50%;
-            color: #b2ebf2;
-            cursor: pointer;
-            transition: all 0.18s ease;
-            padding: 0;
-        }
-        .qa-button:hover {
-            background: rgba(0, 229, 255, 0.18);
-            border-color: var(--accent);
-            color: #fff;
-            transform: scale(1.06);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
-        }
-        .qa-button.qa-primary {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(76, 175, 80, 0.18));
-            border-color: var(--accent);
-            color: #fff;
-        }
-        .qa-button.qa-primary:hover {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.4), rgba(76, 175, 80, 0.3));
-        }
-        @media (max-width: 1024px) {
-            #qa-bar { bottom: 12px; right: 12px; gap: 6px; padding: 6px; }
-            .qa-button { width: 38px; height: 38px; }
-            .qa-button svg { width: 18px; height: 18px; }
-        }
-        @media (max-width: 768px) {
-            /* mobile-bottom-nav と被らないよう持ち上げ + 横並び */
-            #qa-bar { bottom: 70px; right: 8px; gap: 4px; padding: 5px; flex-direction: row; }
-            .qa-button { width: 34px; height: 34px; }
-        }
     </style>
 
     <script src="https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js"></script>
@@ -8290,44 +8118,12 @@
             </div>
 
             <div id="nav-bar">
-                <!-- Phase 6-1: 制作フロー誘導 (Layout → Body → Keycap → Export) -->
-                <div class="nav-row" id="workflow-guide-row">
-                    <div id="workflow-guide" data-hint="hint_workflow_guide">
-                        <button class="wf-step" data-step="layout" data-module="layout" title="">
-                            <span class="wf-num">1</span>
-                            <span class="wf-label" data-i18n="wf_step_layout">レイアウト</span>
-                        </button>
-                        <span class="wf-arrow">→</span>
-                        <button class="wf-step" data-step="body" data-module="body" title="">
-                            <span class="wf-num">2</span>
-                            <span class="wf-label" data-i18n="wf_step_body">ボディ</span>
-                        </button>
-                        <span class="wf-arrow">→</span>
-                        <button class="wf-step" data-step="keycap" data-module="keycap" title="">
-                            <span class="wf-num">3</span>
-                            <span class="wf-label" data-i18n="wf_step_keycap">キーキャップ</span>
-                        </button>
-                        <span class="wf-arrow">→</span>
-                        <button class="wf-step" data-step="export" data-action="export" title="">
-                            <span class="wf-num">4</span>
-                            <span class="wf-label" data-i18n="wf_step_export">出力</span>
-                        </button>
-                    </div>
-                </div>
                 <div class="nav-row" id="module-select-row">
                     <select id="module-select">
                         <option value="keycap" data-i18n="mod_keycap">⌨ Keycap Studio</option>
                         <option value="body" data-i18n="mod_body">🔲 Body Studio</option>
                         <option value="layout" data-i18n="mod_layout">📐 Layout Studio</option>
                     </select>
-                </div>
-                <!-- Phase 6-2: 基本 / 詳細モード切替 -->
-                <div class="nav-row" id="advanced-mode-row">
-                    <label class="adv-toggle" data-hint="hint_advanced_mode">
-                        <input type="checkbox" id="advanced-mode-toggle">
-                        <span class="adv-track"><span class="adv-thumb"></span></span>
-                        <span class="adv-text" data-i18n="lbl_advanced_mode">詳細モード</span>
-                    </label>
                 </div>
                 <div class="nav-row"><select id="section-select">
                         <option value="" data-i18n="nav_jump">--- Jump to Section ---</option>
@@ -8762,7 +8558,7 @@
                         </label>
                     </div>
 
-                    <h3 id="sec-texture" data-mode="advanced" data-i18n="h_texture_map" style="color:#00e5ff; border-color:#00e5ff;">画像テクスチャ
+                    <h3 id="sec-texture" data-i18n="h_texture_map" style="color:#00e5ff; border-color:#00e5ff;">画像テクスチャ
                         (Image Map)</h3>
                     <div class="v63-texture-map-panel">
                         <div class="file-upload" data-hint="hint_img_upload"><label for="img-texture-input"
@@ -8873,7 +8669,7 @@
                     </div>
 
                     <div class="section-sep"></div>
-                    <h3 id="sec-utility" data-mode="advanced" style="color:#00e5ff;">Utility</h3>
+                    <h3 id="sec-utility" style="color:#00e5ff;">Utility</h3>
                     <div class="control-group" style="display:flex; gap:5px; align-items:center;">
                         <button id="btn-random" class="accent" style="border-color:#e040fb; color:#e040fb; flex:1;"
                             data-hint="hint_randomizer">Randomizer</button>
@@ -8883,7 +8679,7 @@
 
                     <input type="checkbox" id="show-dimensions" style="display:none;">
 
-                    <h3 id="sec-import" data-mode="advanced" style="color:#00e5ff; margin-top:10px; border-bottom:1px solid #00e5ff;"
+                    <h3 id="sec-import" style="color:#00e5ff; margin-top:10px; border-bottom:1px solid #00e5ff;"
                         data-i18n="h_import">外部モデル (Import 3D)</h3>
                     <div class="v60-import-panel">
                         <div class="control-group" style="display:flex; gap:5px; align-items: flex-end;">
@@ -9195,7 +8991,7 @@
                         </div>
                     </div>
 
-                    <h3 id="sec-cross-section" data-mode="advanced" data-i18n="h_cross_section">断面ビュー</h3>
+                    <h3 id="sec-cross-section" data-i18n="h_cross_section">断面ビュー</h3>
                     <div class="control-group" data-hint="hint_cross_section">
                         <label class="toggle-switch"><input type="checkbox" id="cross-section-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_enable_cross_section">断面を表示</span></label>
                         <div class="control-row" style="margin-top:6px;">
@@ -9211,7 +9007,7 @@
                         <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="cross_section_note">※ 表示専用機能です。STL/3MF 出力には影響しません。</p>
                     </div>
 
-                    <h3 id="sec-keycap-assist" data-mode="advanced" data-i18n="h_keycap_assist">アシスト機能</h3>
+                    <h3 id="sec-keycap-assist" data-i18n="h_keycap_assist">アシスト機能</h3>
                     <div class="control-group" id="keycap-assist-group">
                         <!-- 1. 素材別補正プリセット -->
                         <label data-i18n="lbl_material_preset">素材プリセット</label>
@@ -31652,105 +31448,7 @@ ${triangles.join('\n')}
 
         document.getElementById('module-select')?.addEventListener('change', (e) => {
             switchModule(e.target.value);
-            _refreshWorkflowGuide();
         });
-
-        // Phase 6-1: ワークフローガイドの状態更新
-        // - 各ステップの状態を「done / active / todo」のいずれかで分類
-        //   - done   = ユーザーが意図的に何か作業した形跡がある
-        //   - active = 現在編集中のモジュール
-        //   - todo   = まだ未着手
-        // - クリックで対応モジュールに切替、または出力ステップは export ボタンを発火
-        function _isLayoutDone() {
-            try {
-                if (window._layoutModule && typeof window._layoutModule.getState === 'function') {
-                    const st = window._layoutModule.getState();
-                    if (st && Array.isArray(st.symbols) && st.symbols.length > 0) return true;
-                    if (st && Array.isArray(st.cadLines) && st.cadLines.length > 0) return true;
-                    if (st && st.activePreset) return true;
-                }
-            } catch (e) { /* ignore */ }
-            return false;
-        }
-        function _isBodyDone() {
-            try {
-                if (window._bodyModule && typeof window._bodyModule.getState === 'function') {
-                    const st = window._bodyModule.getState();
-                    // デフォルト state からの差分を簡易判定: customLayoutData / 任意のテキスト印字 / SVG が有効
-                    if (st && (st.customLayoutData || st.enableTopText || st.enableBottomText || st.enableTopSide || st.enableBottomSide || st.enableSvg)) return true;
-                    // mountType, layout が変更されていれば done 扱い (デフォルト '60' / 'tray' でないなら)
-                    if (st && (st.layout !== '60' || st.mountType !== 'tray')) return true;
-                }
-            } catch (e) { /* ignore */ }
-            return false;
-        }
-        function _isKeycapDone() {
-            try {
-                // 文字 / SVG / インポートモデル / ストラップ穴のいずれかが有効でデフォルトから外れている
-                if (state.text && state.text !== 'A') return true;
-                if (state.text2 && state.enableText2) return true;
-                if (state.enableSide) return true;
-                if (state.enableSvg && state.svgContent) return true;
-                if (state.strapHoleEnabled) return true;
-                if (state.imgContent && state.imgTextureVisible) return true;
-            } catch (e) { /* ignore */ }
-            return false;
-        }
-        function _isExportDone() {
-            try {
-                return localStorage.getItem('kbs_last_export_at') ? true : false;
-            } catch (e) { return false; }
-        }
-        function _refreshWorkflowGuide() {
-            const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
-            const stepsState = {
-                layout: _isLayoutDone() ? 'done' : 'todo',
-                body:   _isBodyDone()   ? 'done' : 'todo',
-                keycap: _isKeycapDone() ? 'done' : 'todo',
-                export: _isExportDone() ? 'done' : 'todo'
-            };
-            // 現在モジュール = active (done より優先)
-            if (stepsState[cur] !== undefined) stepsState[cur] = 'active';
-
-            document.querySelectorAll('#workflow-guide .wf-step').forEach(btn => {
-                const step = btn.dataset.step;
-                btn.classList.remove('wf-active', 'wf-done', 'wf-todo');
-                btn.classList.add('wf-' + (stepsState[step] || 'todo'));
-            });
-        }
-        document.querySelectorAll('#workflow-guide .wf-step').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const mod = btn.dataset.module;
-                const action = btn.dataset.action;
-                if (mod) {
-                    const sel = document.getElementById('module-select');
-                    if (sel) {
-                        sel.value = mod;
-                        sel.dispatchEvent(new Event('change'));
-                    } else {
-                        try { switchModule(mod); } catch (e) { /* ignore */ }
-                        _refreshWorkflowGuide();
-                    }
-                } else if (action === 'export') {
-                    // 出力ステップ: 現在のモジュールに応じた export ボタンをクリック
-                    let exportBtn = null;
-                    if (currentModule === 'body' && window._bodyModule && typeof window._bodyModule.showBodyExportDialog === 'function') {
-                        window._bodyModule.showBodyExportDialog();
-                    } else if (currentModule === 'layout' && window._layoutModule && typeof window._layoutModule.openExportDialog === 'function') {
-                        window._layoutModule.openExportDialog();
-                    } else {
-                        exportBtn = document.getElementById('btn-export-single');
-                        if (exportBtn) exportBtn.click();
-                    }
-                    try { localStorage.setItem('kbs_last_export_at', String(Date.now())); } catch (e) { /* ignore */ }
-                    _refreshWorkflowGuide();
-                }
-            });
-        });
-        // 状態変化 (updateModel 後など) でワークフローガイドを更新するため hook
-        if (typeof window !== 'undefined') window._refreshWorkflowGuide = _refreshWorkflowGuide;
-        // 初期表示
-        setTimeout(_refreshWorkflowGuide, 100);
 
         init();
     </script>
@@ -32403,40 +32101,6 @@ ${triangles.join('\n')}
             if (typeof window !== 'undefined') window._showPreflight = showPreflight;
         })();
 
-        // Phase 6-3: Quick Action Bar
-        (function () {
-            function _bindQa(id, action) {
-                const btn = document.getElementById(id);
-                if (!btn) return;
-                btn.addEventListener('click', action);
-            }
-            _bindQa('qa-quick-save', () => {
-                const saveBtn = document.getElementById('btn-env-export');
-                if (saveBtn) saveBtn.click();
-            });
-            _bindQa('qa-quick-export', () => {
-                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
-                try {
-                    if (cur === 'body' && window._bodyModule && typeof window._bodyModule.showBodyExportDialog === 'function') {
-                        window._bodyModule.showBodyExportDialog();
-                    } else if (cur === 'layout' && window._layoutModule && typeof window._layoutModule.openExportDialog === 'function') {
-                        window._layoutModule.openExportDialog();
-                    } else {
-                        const exp = document.getElementById('btn-export-single');
-                        if (exp) exp.click();
-                    }
-                    try { localStorage.setItem('kbs_last_export_at', String(Date.now())); } catch (e) { /* ignore */ }
-                    if (typeof window._refreshWorkflowGuide === 'function') window._refreshWorkflowGuide();
-                } catch (err) {
-                    console.warn('Quick export failed:', err);
-                }
-            });
-            _bindQa('qa-preflight', () => {
-                const pf = document.getElementById('btn-preflight-check');
-                if (pf) pf.click();
-            });
-        })();
-
         // Phase 9 Keycap: アシスト機能 (素材プリセット / プロファイル比較 / ステム強度 等)
         (function () {
             const MATERIAL_PRESETS = {
@@ -32600,233 +32264,6 @@ ${triangles.join('\n')}
             document.getElementById('keycap-print-sheet-btn')?.addEventListener('click', exportPrintSheet);
         })();
 
-        // Phase 6-2: 基本/詳細モード
-        // h3[data-mode="advanced"] とその「次の h3 まで」の兄弟要素を一括で hide/show する。
-        // ユーザーの選択は localStorage に保存し、リロード後も維持する。
-        (function () {
-            const ADV_KEY = 'kbs_advanced_mode';
-            function applyAdvancedMode(enabled) {
-                document.body.classList.toggle('advanced-mode', enabled);
-                const headers = document.querySelectorAll('h3[data-mode="advanced"]');
-                headers.forEach(h => {
-                    if (enabled) h.style.removeProperty('display');
-                    else h.style.display = 'none';
-                    let cur = h.nextElementSibling;
-                    while (cur && cur.tagName !== 'H3') {
-                        if (enabled) {
-                            if (cur.dataset._wasAdv === '1') {
-                                cur.style.removeProperty('display');
-                                delete cur.dataset._wasAdv;
-                            }
-                        } else {
-                            if (cur.style.display !== 'none') {
-                                cur.dataset._wasAdv = '1';
-                                cur.style.display = 'none';
-                            }
-                        }
-                        cur = cur.nextElementSibling;
-                    }
-                });
-            }
-            const advToggle = document.getElementById('advanced-mode-toggle');
-            if (advToggle) {
-                let saved = '0';
-                try { saved = localStorage.getItem(ADV_KEY) || '0'; } catch (e) { /* ignore */ }
-                advToggle.checked = saved === '1';
-                applyAdvancedMode(advToggle.checked);
-                advToggle.addEventListener('change', () => {
-                    applyAdvancedMode(advToggle.checked);
-                    try { localStorage.setItem(ADV_KEY, advToggle.checked ? '1' : '0'); } catch (e) { /* ignore */ }
-                });
-            }
-        })();
-    </script>
-
-    <!-- Phase 6-3: Quick Action Bar (3 Studio 共通の保存/出力/チェック) -->
-    <div id="qa-bar" data-hint="hint_qa_bar">
-        <button id="qa-quick-save" class="qa-button" title="Quick save (.kbsproj)" aria-label="Quick save">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/></svg>
-        </button>
-        <button id="qa-quick-export" class="qa-button qa-primary" title="Export current module" aria-label="Export">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-        </button>
-        <button id="qa-preflight" class="qa-button" title="Pre-flight check" aria-label="Pre-flight">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
-        </button>
-        <button id="qa-tools" class="qa-button" title="Tools (screenshot / cost / diagnostic / history)" aria-label="Tools">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
-        </button>
-    </div>
-
-    <!-- Phase 10+ Common Tools Modal (Screenshot / Cost / Diagnostic / History) -->
-    <div id="tools-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9998; display:none; align-items:center; justify-content:center;">
-        <div style="background:#1a1a2e; padding:20px 24px; border-radius:8px; max-width:600px; width:90%; max-height:80vh; overflow:auto; border:1px solid #00e5ff; box-shadow:0 0 24px rgba(0,229,255,0.25);">
-            <h3 style="color:#00e5ff; margin:0 0 12px 0; border-bottom:1px solid #444; padding-bottom:8px;" data-i18n="tools_title">ツール</h3>
-            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
-                <button id="tool-screenshot" class="secondary btn-small" style="border-color:#4fc3f7; color:#4fc3f7; padding:10px;" data-i18n="tool_screenshot">📷 スクリーンショット (PNG)</button>
-                <button id="tool-cost" class="secondary btn-small" style="border-color:#69f0ae; color:#69f0ae; padding:10px;" data-i18n="tool_cost">💰 コスト見積もり</button>
-                <button id="tool-diagnostic" class="secondary btn-small" style="border-color:#ffb74d; color:#ffb74d; padding:10px;" data-i18n="tool_diagnostic">🔧 エラー診断</button>
-                <button id="tool-history" class="secondary btn-small" style="border-color:#ba68c8; color:#ba68c8; padding:10px;" data-i18n="tool_history">📜 履歴一覧</button>
-            </div>
-            <div id="tools-result" style="margin-top:14px; padding:10px 12px; background:rgba(0,0,0,0.3); border-radius:4px; font-size:0.82rem; line-height:1.5; min-height:40px; max-height:380px; overflow:auto; display:none;"></div>
-            <div style="margin-top:14px; text-align:right;">
-                <button id="btn-close-tools" class="secondary btn-small" style="border-color:#00e5ff; color:#00e5ff;" data-i18n="btn_close">閉じる</button>
-            </div>
-        </div>
-    </div>
-    <script>
-        // Phase 10+ Common Tools — 3 Studio 共通の補助ツール (スクショ / コスト / 診断 / 履歴)
-        (function () {
-            const _errorLog = [];
-            const _MAX_ERRORS = 50;
-            window.addEventListener('error', (e) => {
-                _errorLog.push({ ts: Date.now(), kind: 'error', msg: e.message || String(e), src: e.filename, line: e.lineno });
-                if (_errorLog.length > _MAX_ERRORS) _errorLog.shift();
-            });
-            window.addEventListener('unhandledrejection', (e) => {
-                _errorLog.push({ ts: Date.now(), kind: 'unhandledrejection', msg: (e.reason && (e.reason.message || e.reason.toString())) || 'Unknown rejection' });
-                if (_errorLog.length > _MAX_ERRORS) _errorLog.shift();
-            });
-            function showResult(html) {
-                const out = document.getElementById('tools-result');
-                if (!out) return;
-                out.innerHTML = html;
-                out.style.display = '';
-            }
-            function takeScreenshot() {
-                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
-                const canvas = (cur === 'layout')
-                    ? document.querySelector('#layout-canvas-container canvas')
-                    : document.querySelector('#canvas-container canvas');
-                if (!canvas) { showResult('<div style="color:#ff5252;">⚠️ canvas が見つかりません</div>'); return; }
-                try {
-                    canvas.toBlob((blob) => {
-                        if (!blob) { showResult('<div style="color:#ff5252;">⚠️ 画像生成に失敗</div>'); return; }
-                        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                        const fname = `KeybordStudio_${cur}_${stamp}.png`;
-                        if (typeof saveAs === 'function') {
-                            saveAs(blob, fname);
-                        } else {
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url; a.download = fname;
-                            a.click();
-                            setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        }
-                        showResult(`<div style="color:#69f0ae;">✅ 保存完了: ${fname} (${(blob.size/1024).toFixed(1)} KB)</div>`);
-                    }, 'image/png');
-                } catch (err) {
-                    showResult(`<div style="color:#ff5252;">⚠️ ${err.message || err}</div>`);
-                }
-            }
-            function showCostEstimate() {
-                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
-                const PRICES = {
-                    pla:   { density: 1.24, perKg: 25 },
-                    abs:   { density: 1.04, perKg: 28 },
-                    petg:  { density: 1.27, perKg: 28 },
-                    nylon: { density: 1.13, perKg: 60 },
-                    resin: { density: 1.10, perKg: 70 }
-                };
-                let html = `<div style="font-weight:bold; margin-bottom:6px;">コスト見積もり (${cur})</div>`;
-                let volCm3 = 0;
-                if (cur === 'keycap') {
-                    try {
-                        const p = (typeof getParams === 'function') ? getParams() : null;
-                        if (p) {
-                            const fillFactor = 0.22 + ((state.wallThickness || 1.5) - 1.5) * 0.1 + (state.boxStem ? 0.05 : 0);
-                            volCm3 = (p.baseW * p.baseD * p.h * fillFactor) / 1000;
-                        }
-                    } catch (e) { /* ignore */ }
-                } else if (cur === 'body' && window._bodyModule) {
-                    try {
-                        const st = window._bodyModule.getState();
-                        const w = 380, d = 130;
-                        const h = (st.bezelTop || 5) + (st.bezelBottom || 8) + (st.bottomThickness || 2.5);
-                        const wt = st.wallThickness || 3.0;
-                        volCm3 = Math.max(0, (w * d * h - (w - wt*2) * (d - wt*2) * (h - 2)) / 1000);
-                    } catch (e) { /* ignore */ }
-                } else if (cur === 'layout') {
-                    showResult('<div>レイアウト Studio には材料コストは適用されません (CNC 切削はベンダーごとに料金が異なるため)。</div>');
-                    return;
-                }
-                if (volCm3 <= 0) {
-                    showResult('<div style="color:#ff9800;">⚠️ 体積を推定できませんでした</div>');
-                    return;
-                }
-                html += `<div style="margin-bottom:8px;">推定体積: <strong>${volCm3.toFixed(2)}</strong> cm³</div>`;
-                html += '<table style="width:100%; font-size:0.8rem;"><tr><th style="text-align:left;">材料</th><th>重量</th><th>コスト</th></tr>';
-                for (const [k, v] of Object.entries(PRICES)) {
-                    const w = volCm3 * v.density;
-                    const c = (w / 1000) * v.perKg;
-                    html += `<tr><td>${k.toUpperCase()}</td><td>${w.toFixed(1)} g</td><td>$${c.toFixed(2)}</td></tr>`;
-                }
-                html += '</table><div style="margin-top:8px; font-size:0.7rem; color:#888;">※ 概算。スライサーで実使用量を確認推奨。</div>';
-                showResult(html);
-            }
-            function showDiagnostic() {
-                const env = [];
-                env.push(`UA: ${navigator.userAgent.slice(0, 80)}`);
-                env.push(`Memory: ${navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'N/A'}`);
-                env.push(`Workers: ${typeof Worker !== 'undefined' ? 'OK' : 'NG'}`);
-                env.push(`WebAssembly: ${typeof WebAssembly !== 'undefined' ? 'OK' : 'NG'}`);
-                env.push(`IndexedDB: ${typeof indexedDB !== 'undefined' ? 'OK' : 'NG'}`);
-                env.push(`localStorage: ${(() => { try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return 'OK'; } catch(e){return 'NG';} })()}`);
-                env.push(`THREE: ${typeof THREE !== 'undefined' ? (THREE.REVISION || 'unknown') : 'NG'}`);
-                env.push(`FontEngine3D: ${typeof FontEngine3D !== 'undefined' ? 'OK' : 'NG'}`);
-                env.push(`MeshFixLib: ${(typeof MeshFixLib !== 'undefined') ? 'OK' : 'N/A (Worker内)'}`);
-                env.push(`Pyodide: ${typeof loadPyodide === 'function' || (typeof window !== 'undefined' && window.pyodide) ? 'OK' : 'N/A'}`);
-                let html = '<div style="font-weight:bold; margin-bottom:6px;">環境</div><ul style="font-size:0.78rem; line-height:1.4;">';
-                for (const e of env) html += `<li>${e}</li>`;
-                html += '</ul>';
-                html += `<div style="font-weight:bold; margin-top:10px; margin-bottom:6px;">エラーログ (${_errorLog.length} 件)</div>`;
-                if (_errorLog.length === 0) {
-                    html += '<div style="color:#69f0ae;">✅ エラーなし</div>';
-                } else {
-                    html += '<ul style="font-size:0.75rem; line-height:1.4;">';
-                    for (const e of _errorLog.slice(-10).reverse()) {
-                        const t = new Date(e.ts).toLocaleTimeString();
-                        html += `<li style="margin-bottom:4px; padding:4px 6px; background:rgba(255,82,82,0.08); border-left:2px solid #ff5252; border-radius:2px;"><span style="color:#888;">[${t}]</span> ${e.msg}${e.src ? `<br><span style="color:#888; font-size:0.7rem;">${e.src}:${e.line || '?'}</span>` : ''}</li>`;
-                    }
-                    html += '</ul>';
-                }
-                showResult(html);
-            }
-            function showHistory() {
-                let html = '<div style="font-weight:bold; margin-bottom:6px;">履歴一覧</div>';
-                try {
-                    if (typeof history !== 'undefined' && Array.isArray(history) && typeof historyIndex === 'number') {
-                        html += `<div>Keycap: <strong>${history.length}</strong> 世代 (現在 #${historyIndex + 1})</div>`;
-                    }
-                } catch (e) { /* ignore */ }
-                try {
-                    const lastExp = localStorage.getItem('kbs_last_export_at');
-                    if (lastExp) {
-                        const d = new Date(parseInt(lastExp, 10));
-                        html += `<div>最終出力: ${d.toLocaleString()}</div>`;
-                    }
-                } catch (e) { /* ignore */ }
-                html += '<div style="margin-top:10px; font-size:0.72rem; color:#888;">※ 詳細な世代スナップショット表示は Phase 11+ で実装予定。現状は Undo/Redo 世代カウントと最終出力時刻のみ。</div>';
-                showResult(html);
-            }
-            function openTools() {
-                const m = document.getElementById('tools-modal');
-                if (m) { m.style.display = 'flex'; document.getElementById('tools-result').style.display = 'none'; }
-            }
-            function closeTools() {
-                const m = document.getElementById('tools-modal');
-                if (m) m.style.display = 'none';
-            }
-            document.getElementById('qa-tools')?.addEventListener('click', openTools);
-            document.getElementById('btn-close-tools')?.addEventListener('click', closeTools);
-            document.getElementById('tools-modal')?.addEventListener('click', (e) => {
-                if (e.target.id === 'tools-modal') closeTools();
-            });
-            document.getElementById('tool-screenshot')?.addEventListener('click', takeScreenshot);
-            document.getElementById('tool-cost')?.addEventListener('click', showCostEstimate);
-            document.getElementById('tool-diagnostic')?.addEventListener('click', showDiagnostic);
-            document.getElementById('tool-history')?.addEventListener('click', showHistory);
-        })();
     </script>
 
 </body>
