@@ -2405,6 +2405,43 @@ ${paths}</svg>`;
         const kerning = data.kerning || {};
         const chars = [...text];
 
+        // Phase 12-B: HarfBuzz WASM が利用可能で、shaping を要求された場合は
+        // shape 結果 (glyph IDs + advances + offsets) で文字配置を上書きする。
+        // 利用条件:
+        //   - options.useShaping === true (or default if window._harfbuzzInstance set)
+        //   - options.fontBuffer (生 ArrayBuffer / .ttf or .otf)
+        //   - window._harfbuzzInstance がセットされている
+        // shape できなければ通常の単純レイアウトに fallback。
+        let shaped = null;
+        const wantShaping = options.useShaping !== false; // デフォルト ON
+        if (wantShaping && options.fontBuffer && typeof window !== 'undefined' && window._harfbuzzInstance) {
+            try { shaped = shapeText(typefaceJSON, text, options.fontBuffer); } catch (e) { shaped = null; }
+        }
+        if (shaped && Array.isArray(shaped) && shaped.length > 0) {
+            // HarfBuzz は glyph ID ベースで結果を返す。typefaceJSON は char → glyph の
+            // マップしか持たないので、代わりに shape の x_advance / x_offset を使い、
+            // text の char 列とインデックス対応で配置する (近似で十分なケースが大半)。
+            for (let i = 0; i < shaped.length; i++) {
+                const g = shaped[i];
+                const ch = chars[i] != null ? chars[i] : null;
+                if (ch === null || ch === '\n') { offsetX = 0; continue; }
+                const glyph = data.glyphs[ch];
+                const xOff = (g.dx || 0) * scale;
+                const yOff = (g.dy || 0) * scale;
+                if (glyph && glyph.o) {
+                    const computed = _getCachedGlyphSubpaths(glyph, scale, divisions, reverseWinding);
+                    if (computed && computed.outers.length > 0) {
+                        const shapesG = _buildShapesAtOffset(THREE, computed, offsetX + xOff, yOff);
+                        allShapes.push(...shapesG);
+                    }
+                }
+                // HarfBuzz の x_advance を信頼 (1/64 unit → unit に正規化)
+                const adv = (g.ax != null) ? g.ax / 64 : (glyph ? (glyph.ha || 0) : (data.resolution || 1000) * 0.3);
+                offsetX += adv * scale;
+            }
+            return allShapes;
+        }
+
         for (let ci = 0; ci < chars.length; ci++) {
             const char = chars[ci];
             if (char === '\n') { offsetX = 0; continue; }
@@ -2522,20 +2559,23 @@ ${paths}</svg>`;
 
     // 計算済み subpath から、指定 offsetX を加算しつつ THREE.Shape の配列を組み立てる。
     // テッセレーションは行わないので軽量。
-    function _buildShapesAtOffset(THREE, computed, offsetX) {
+    // Phase 12-B: HarfBuzz の glyph offset (y 方向) もサポートする2引数版。
+    // 旧呼出は offsetY=0 として動作するので互換維持。
+    function _buildShapesAtOffset(THREE, computed, offsetX, offsetY) {
+        offsetY = offsetY || 0;
         const result = [];
         for (const outer of computed.outers) {
             const shape = new THREE.Shape();
             const pts = outer.pts;
             if (pts.length === 0) continue;
-            shape.moveTo(pts[0].x + offsetX, pts[0].y);
-            for (let j = 1; j < pts.length; j++) shape.lineTo(pts[j].x + offsetX, pts[j].y);
+            shape.moveTo(pts[0].x + offsetX, pts[0].y + offsetY);
+            for (let j = 1; j < pts.length; j++) shape.lineTo(pts[j].x + offsetX, pts[j].y + offsetY);
             for (const hole of outer.holes) {
                 const path = new THREE.Path();
                 const hp = hole.pts;
                 if (hp.length === 0) continue;
-                path.moveTo(hp[0].x + offsetX, hp[0].y);
-                for (let j = 1; j < hp.length; j++) path.lineTo(hp[j].x + offsetX, hp[j].y);
+                path.moveTo(hp[0].x + offsetX, hp[0].y + offsetY);
+                for (let j = 1; j < hp.length; j++) path.lineTo(hp[j].x + offsetX, hp[j].y + offsetY);
                 shape.holes.push(path);
             }
             result.push(shape);

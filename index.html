@@ -31504,6 +31504,37 @@ ${triangles.join('\n')}
             switchModule(e.target.value);
         });
 
+        // Phase 12-B: HarfBuzz WASM オプション初期化
+        // 既定では読み込まない (~600KB)。複雑文字 (アラビア / インド / タイ / 合字) を
+        // 正確にレイアウトしたい場合のみ、ユーザーが明示的に有効化する。
+        // 有効化方法: localStorage.setItem('kbs_enable_harfbuzz', '1') して再読込。
+        // 公開 API: window._kbsLoadHarfBuzz() を呼ぶと動的に load する。
+        if (typeof window !== 'undefined') {
+            window._kbsLoadHarfBuzz = async function () {
+                if (window._harfbuzzInstance) return window._harfbuzzInstance;
+                try {
+                    const hbjsModule = await import('https://cdn.jsdelivr.net/npm/harfbuzzjs@0.5.0/hbjs.js');
+                    const wasmResp = await fetch('https://cdn.jsdelivr.net/npm/harfbuzzjs@0.5.0/hb.wasm');
+                    const wasmBuf = await wasmResp.arrayBuffer();
+                    const { instance } = await WebAssembly.instantiate(wasmBuf);
+                    const hb = (hbjsModule.default || hbjsModule)(instance);
+                    window._harfbuzzInstance = hb;
+                    if (typeof showToast === 'function') showToast('HarfBuzz WASM ロード完了 (複雑文字 shaping ON)');
+                    return hb;
+                } catch (err) {
+                    console.warn('HarfBuzz load failed:', err);
+                    if (typeof showToast === 'function') showToast('HarfBuzz 読み込み失敗: ' + (err.message || err));
+                    return null;
+                }
+            };
+            // localStorage で有効化されていれば自動ロード
+            try {
+                if (localStorage.getItem('kbs_enable_harfbuzz') === '1') {
+                    setTimeout(() => window._kbsLoadHarfBuzz(), 1500);
+                }
+            } catch (e) { /* ignore */ }
+        }
+
         // Phase 11: Cross-Studio 依存関係チェック + 一括再生成
         // Layout Studio で配列が変わると、Body の customLayoutData が古い可能性がある。
         // 切替時に依存関係をチェックして警告し、ユーザーが望めば一括で再計算する。

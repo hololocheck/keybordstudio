@@ -21,6 +21,16 @@
 // 依存している。本格的な分離は Phase 12+ で段階的に進める。
 // =============================================
 
+// Phase 12-C: 切り出した state / presets / helpers をここから re-export。
+// 新規コードは `import { KEYCAP_INITIAL_STATE, ... } from './modules/keycap/keycap-module.js'`
+// または個別ファイルを直接 import する。
+export { KEYCAP_INITIAL_STATE, createKeycapState } from './keycap-state.js';
+export { PROFILE_INFO, ROW_INFO, MATERIAL_PRESETS, ENGRAVE_DEPTH_PRESETS, STEM_TYPES,
+         listProfileNames, listRowNames, listMaterialIds } from './keycap-presets.js';
+export { lerp, clamp, deg2rad, rad2deg, hexToRgb, rgbToHex, colorDiff,
+         pointInRect, pointInCircle, estimateWeightGrams, estimateCostUSD,
+         deepClone, shallowDiff } from './keycap-helpers.js';
+
 const MODULE_ID = 'keycap';
 const MODULE_NAME = 'Keycap Studio';
 const MODULE_PATH = 'modules/keycap/';
