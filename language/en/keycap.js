@@ -421,7 +421,10 @@ export const keycapEn = {
     opt_engrave_fdm: "FDM (deep)", opt_engrave_resin: "Resin (shallow)", opt_engrave_laser: "Laser (very shallow)", opt_engrave_inlay: "Inlay (deep)",
     btn_profile_compare: "Compare profiles", btn_stem_strength: "Stem strength check", btn_clearance_check: "Press clearance check",
     lbl_row_batch: "Row generator",
-    btn_theme_save: "Save current as theme", btn_theme_load: "Theme list",
+    // (theme buttons removed in Phase 14)
+    lbl_keyset_view: "Keyset view (whole keyboard)",
+    btn_keyset_export: "Bulk STL export",
+    keyset_note: "* All keys use the current profile/color settings. Labels come from the layout. To edit individual keys, turn keyset view OFF.",
     lbl_safe_area: "Show top safe area", btn_print_sheet: "1:1 print sheet (SVG)"
     // (Phase 11 cleanup: tools_* / tool_* keys removed — Quick Action Bar deleted)
 };

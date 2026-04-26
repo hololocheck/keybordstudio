@@ -9067,13 +9067,30 @@
                             <button class="btn-small secondary keycap-row-btn" data-row="r4">R4</button>
                             <button class="btn-small secondary keycap-row-btn" data-row="f-row">F</button>
                         </div>
-                        <!-- 7. キーセットテーマ管理 -->
-                        <button id="keycap-theme-save-btn" class="btn-small secondary" style="margin-top:8px; width:100%; border-color:#4caf50; color:#4caf50;" data-i18n="btn_theme_save">現在の設定をテーマ保存</button>
-                        <button id="keycap-theme-load-btn" class="btn-small secondary" style="margin-top:4px; width:100%; border-color:#4caf50; color:#4caf50;" data-i18n="btn_theme_load">テーマ一覧</button>
+                        <!-- 7. (テーマボタン削除済) -->
                         <!-- 8. トップ面安全領域 -->
                         <label class="toggle-switch" style="margin-top:8px;"><input type="checkbox" id="keycap-safe-area-toggle" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_safe_area">トップ面安全領域を表示</span></label>
                         <!-- 9. 実寸印刷チェックシート (SVG) -->
                         <button id="keycap-print-sheet-btn" class="btn-small secondary" style="margin-top:8px; width:100%; border-color:#26c6da; color:#26c6da;" data-i18n="btn_print_sheet">実寸チェックシート (SVG)</button>
+                        <!-- 10. 配列ビュー (Phase 14) -->
+                        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #444;">
+                            <label class="toggle-switch" style="margin-bottom:6px;">
+                                <input type="checkbox" id="keycap-keyset-view-enabled" class="toggle-input">
+                                <span class="toggle-knob"></span>
+                                <span class="toggle-label" data-i18n="lbl_keyset_view">配列ビュー (キーボード全体)</span>
+                            </label>
+                            <div class="control-row">
+                                <select id="keycap-keyset-layout" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; flex:1; font-size:0.85rem; border-radius:3px;">
+                                    <option value="60-ansi">60% ANSI</option>
+                                    <option value="65-ansi">65% ANSI</option>
+                                    <option value="tkl-ansi">TKL ANSI</option>
+                                    <option value="full-ansi">Full ANSI</option>
+                                    <option value="60-jis">60% JIS</option>
+                                </select>
+                                <button id="keycap-keyset-export-btn" class="btn-small secondary" style="border-color:#ff7043; color:#ff7043;" data-i18n="btn_keyset_export">一括 STL 出力</button>
+                            </div>
+                            <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="keyset_note">※ 配列ビュー時は現在のプロファイル/色設定を全キーに適用。ラベルは配列定義から。個別キー編集は配列ビューを OFF にして通常モードで。</p>
+                        </div>
                         <!-- 結果表示 -->
                         <div id="keycap-assist-result" style="display:none; margin-top:10px; padding:8px 10px; background:rgba(255,255,255,0.04); border-left:3px solid #ba68c8; border-radius:3px; font-size:0.74rem; line-height:1.5; max-height:300px; overflow-y:auto;"></div>
                     </div>
@@ -12333,7 +12350,11 @@ result
             keycapRow: 'r3',               // 'r1' | 'r2' | 'r3' | 'r4' | 'f-row'
             currentTheme: null,            // セットテーマ名
             showSafeArea: false,           // トップ面安全領域 HUD
-            engraveDepthPreset: 'fdm'      // 'fdm' | 'resin' | 'laser' | 'inlay'
+            engraveDepthPreset: 'fdm',     // 'fdm' | 'resin' | 'laser' | 'inlay'
+            // Phase 14: 配列ビュー (キーボード全体を 3D に並べて確認・編集・一括保存)
+            keysetViewEnabled: false,
+            keysetLayoutId: '60-ansi',     // '60-ansi' | '65-ansi' | 'tkl-ansi' | 'full-ansi' | '60-jis'
+            keysetSpacing: 19.05            // mm キーピッチ
         };
         let state = JSON.parse(JSON.stringify(initialState));
         let importedModelBuffer = null;
@@ -31504,6 +31525,229 @@ ${triangles.join('\n')}
             switchModule(e.target.value);
         });
 
+        // ==========================================================================
+        // Phase 14: 配列ビュー (キーボード全体プレビュー + 一括 STL 出力)
+        // ==========================================================================
+        // キーキャップを 1 個ずつ詳細描画するのは重いので、配列ビューでは各キーを
+        //   - 単純な BoxGeometry (ロー高さ + 上面 taper) で描画
+        //   - 上面に label を Sprite (canvas テクスチャ) で表示
+        // して並べる。プロファイル形状の体感再現は通常モード (1キー詳細) を使う。
+        //
+        // 一括出力は現在の state を共有しつつ各キーの label と幅を上書きして
+        // updateModel を呼び、出てきた STL をまとめて ZIP にする。
+        const KEYSET_LAYOUTS = {
+            // 配列定義: 各キーは { x, y, w, h?, label, row? } (1u 単位、左上原点)
+            // 簡略のため US ANSI / 日本語 JIS の代表的レイアウトのみ
+            '60-ansi': (function () {
+                const r = [];
+                // R1 数字行
+                'ESC|1|2|3|4|5|6|7|8|9|0|-|=|⌫'.split('|').forEach((l, i) => {
+                    r.push({ x: i, y: 0, w: i === 13 ? 2 : 1, label: l, row: 'R1' });
+                });
+                // R2 上段 (Tab + QWERTY)
+                let x = 0;
+                r.push({ x, y: 1, w: 1.5, label: 'Tab', row: 'R2' }); x += 1.5;
+                'QWERTYUIOP[]\\'.split('').forEach(l => { r.push({ x, y: 1, w: 1, label: l, row: 'R2' }); x += 1; });
+                r.push({ x, y: 1, w: 1.5, label: '\\', row: 'R2' });
+                // R3 (Caps + ASDF)
+                x = 0;
+                r.push({ x, y: 2, w: 1.75, label: 'Caps', row: 'R3' }); x += 1.75;
+                'ASDFGHJKL;\''.split('').forEach(l => { r.push({ x, y: 2, w: 1, label: l, row: 'R3' }); x += 1; });
+                r.push({ x, y: 2, w: 2.25, label: 'Enter', row: 'R3' });
+                // R4 (Shift + ZXCV)
+                x = 0;
+                r.push({ x, y: 3, w: 2.25, label: 'Shift', row: 'R4' }); x += 2.25;
+                'ZXCVBNM,./'.split('').forEach(l => { r.push({ x, y: 3, w: 1, label: l, row: 'R4' }); x += 1; });
+                r.push({ x, y: 3, w: 2.75, label: 'Shift', row: 'R4' });
+                // R5 (Modifier + Space)
+                x = 0;
+                r.push({ x, y: 4, w: 1.25, label: 'Ctrl', row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Win',  row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Alt',  row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 6.25, label: '',     row: 'R4' }); x += 6.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Alt',  row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Win',  row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Menu', row: 'R4' }); x += 1.25;
+                r.push({ x, y: 4, w: 1.25, label: 'Ctrl', row: 'R4' });
+                return r;
+            })(),
+            '65-ansi': null,    // 60-ansi + 矢印列を後で追加
+            'tkl-ansi': null,   // 60-ansi + ファンクション + ナビ
+            'full-ansi': null,  // tkl + テンキー
+            '60-jis': null      // 60-ansi の variant
+        };
+        // 65/TKL/Full は 60-ansi をベースに簡易拡張
+        KEYSET_LAYOUTS['65-ansi'] = (function () {
+            const base = KEYSET_LAYOUTS['60-ansi'].map(k => ({ ...k, x: k.x }));
+            // 矢印キー右側列 (16-17u 付近)
+            base.push({ x: 15, y: 0, w: 1, label: 'Del', row: 'R1' });
+            base.push({ x: 15, y: 1, w: 1, label: 'PgU', row: 'R2' });
+            base.push({ x: 15, y: 2, w: 1, label: 'PgD', row: 'R3' });
+            base.push({ x: 14, y: 3, w: 1, label: '↑',   row: 'R4' });
+            base.push({ x: 13, y: 4, w: 1, label: '←',   row: 'R4' });
+            base.push({ x: 14, y: 4, w: 1, label: '↓',   row: 'R4' });
+            base.push({ x: 15, y: 4, w: 1, label: '→',   row: 'R4' });
+            return base;
+        })();
+        KEYSET_LAYOUTS['tkl-ansi'] = (function () {
+            const base = KEYSET_LAYOUTS['65-ansi'].map(k => ({ ...k, y: k.y + 1 }));
+            // ファンクション行 (y=0)
+            const fkeys = ['Esc',null,'F1','F2','F3','F4',null,'F5','F6','F7','F8',null,'F9','F10','F11','F12','PrSc','ScL','Pse'];
+            let fx = 0;
+            for (let i = 0; i < fkeys.length; i++) {
+                if (fkeys[i] === null) { fx += 0.5; continue; }
+                base.push({ x: fx, y: 0, w: 1, label: fkeys[i], row: 'F' });
+                fx += 1;
+            }
+            // ナビゲーション 6 キー (y=1-2, x=15.25-)
+            base.push({ x: 16.25, y: 1, w: 1, label: 'Ins', row: 'R1' });
+            base.push({ x: 17.25, y: 1, w: 1, label: 'Hm',  row: 'R1' });
+            base.push({ x: 18.25, y: 1, w: 1, label: 'PgU', row: 'R1' });
+            base.push({ x: 16.25, y: 2, w: 1, label: 'Del', row: 'R2' });
+            base.push({ x: 17.25, y: 2, w: 1, label: 'End', row: 'R2' });
+            base.push({ x: 18.25, y: 2, w: 1, label: 'PgD', row: 'R2' });
+            return base;
+        })();
+        KEYSET_LAYOUTS['full-ansi'] = (function () {
+            const base = KEYSET_LAYOUTS['tkl-ansi'].map(k => ({ ...k }));
+            // Numpad (y=1-5, x=19.5-22.5)
+            base.push({ x: 19.5, y: 1, w: 1, label: 'NL', row: 'R1' });
+            base.push({ x: 20.5, y: 1, w: 1, label: '/',  row: 'R1' });
+            base.push({ x: 21.5, y: 1, w: 1, label: '*',  row: 'R1' });
+            base.push({ x: 22.5, y: 1, w: 1, label: '-',  row: 'R1' });
+            const nums = [['7','8','9'],['4','5','6'],['1','2','3'],['0','.']];
+            for (let r = 0; r < nums.length; r++) {
+                for (let c = 0; c < nums[r].length; c++) {
+                    const w = (r === 3 && c === 0) ? 2 : 1;
+                    base.push({ x: 19.5 + c, y: 2 + r, w, label: nums[r][c], row: 'R' + (r+1) });
+                }
+            }
+            base.push({ x: 22.5, y: 2, w: 1, h: 2, label: '+', row: 'R2' });
+            base.push({ x: 22.5, y: 4, w: 1, h: 2, label: '↵', row: 'R3' });
+            return base;
+        })();
+        KEYSET_LAYOUTS['60-jis'] = (function () {
+            const base = KEYSET_LAYOUTS['60-ansi'].filter(k => k.label !== 'Enter' && k.label !== '\\');
+            // JIS は ISO Enter (L字) 風 + 半角/全角キー追加
+            base.push({ x: 13, y: 2, w: 1, label: '↵',    row: 'R3' }); // 仮 (L字は別途 ISO Shape)
+            base.push({ x: 0,  y: 0, w: 1, label: '半/全', row: 'R1' });
+            return base;
+        })();
+
+        // 配列ビュー描画 (BoxGeometry + Sprite ラベル)
+        function _buildKeysetSpriteLabel(text) {
+            const c = document.createElement('canvas');
+            c.width = 256; c.height = 128;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.fillRect(0, 0, 256, 128);
+            ctx.fillStyle = state.colText || '#00e5ff';
+            ctx.font = 'bold 56px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text || '', 128, 64);
+            const tex = new THREE.CanvasTexture(c);
+            tex.minFilter = THREE.LinearFilter;
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+            const sprite = new THREE.Sprite(mat);
+            return sprite;
+        }
+        function updateKeysetModel() {
+            mainGroup.clear();
+            const layoutKey = state.keysetLayoutId || '60-ansi';
+            const layout = KEYSET_LAYOUTS[layoutKey];
+            if (!layout) return;
+            const pitch = state.keysetSpacing || 19.05;
+            const baseHeight = 9.5; // R3 概算
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: state.colBody || '#333333', roughness: 0.6, metalness: 0.1
+            });
+            // 配列のセンター原点に合わせて offset 計算
+            let maxX = 0, maxY = 0;
+            for (const k of layout) {
+                maxX = Math.max(maxX, k.x + (k.w || 1));
+                maxY = Math.max(maxY, k.y + (k.h || 1));
+            }
+            const ox = -maxX * pitch / 2;
+            const oz = -maxY * pitch / 2;
+            for (const k of layout) {
+                const w = (k.w || 1) * pitch - 1.0;
+                const d = (k.h || 1) * pitch - 1.0;
+                const cx = ox + k.x * pitch + w / 2 + 0.5;
+                const cz = oz + k.y * pitch + d / 2 + 0.5;
+                // Box (簡易キーキャップ)
+                const geo = new THREE.BoxGeometry(w, baseHeight, d);
+                const mesh = new THREE.Mesh(geo, bodyMat);
+                mesh.position.set(cx, baseHeight / 2, cz);
+                mainGroup.add(mesh);
+                // Label (Sprite)
+                if (k.label) {
+                    const sprite = _buildKeysetSpriteLabel(k.label);
+                    sprite.position.set(cx, baseHeight + 0.5, cz);
+                    sprite.scale.set(Math.min(w * 0.9, 12), Math.min(d * 0.6, 6), 1);
+                    mainGroup.add(sprite);
+                }
+            }
+            calculateStats();
+        }
+
+        // 一括 STL 出力 (各キーを単純 Box geometry で出力 → ZIP)
+        async function exportKeysetSTL() {
+            const layoutKey = state.keysetLayoutId || '60-ansi';
+            const layout = KEYSET_LAYOUTS[layoutKey];
+            if (!layout) { showToast('layout not found'); return; }
+            if (typeof JSZip === 'undefined') { showToast('JSZip 未読込'); return; }
+            const isJa = currentLang === 'ja';
+            showToast(isJa ? `配列 ${layoutKey} を ${layout.length} キー一括出力中...` : `Bulk exporting ${layout.length} keys (${layoutKey})...`);
+            try {
+                const zip = new JSZip();
+                const exporter = new STLExporter();
+                const pitch = state.keysetSpacing || 19.05;
+                const baseHeight = 9.5;
+                for (let i = 0; i < layout.length; i++) {
+                    const k = layout[i];
+                    const w = (k.w || 1) * pitch - 1.0;
+                    const d = (k.h || 1) * pitch - 1.0;
+                    const geo = new THREE.BoxGeometry(w, baseHeight, d);
+                    const mesh = new THREE.Mesh(geo);
+                    const stl = exporter.parse(mesh);
+                    const safeLabel = (k.label || `k${i}`).replace(/[\\/:*?"<>|]/g, '_');
+                    zip.file(`${String(i).padStart(3, '0')}_${safeLabel}_${k.w || 1}u.stl`, stl);
+                }
+                const blob = await zip.generateAsync({ type: 'blob' });
+                if (typeof saveAs === 'function') saveAs(blob, `KeybordStudio_${layoutKey}_${layout.length}keys.zip`);
+                showToast(isJa ? `配列 ${layoutKey} 一括出力完了 (${layout.length} ファイル)` : `Bulk export done (${layout.length} files)`);
+            } catch (e) {
+                console.error('Keyset bulk export error:', e);
+                showToast('一括出力失敗: ' + (e.message || e));
+            }
+        }
+
+        // toggle / select / button のイベント
+        document.getElementById('keycap-keyset-view-enabled')?.addEventListener('change', (e) => {
+            state.keysetViewEnabled = e.target.checked;
+            requestUpdate();
+        });
+        document.getElementById('keycap-keyset-layout')?.addEventListener('change', (e) => {
+            state.keysetLayoutId = e.target.value;
+            if (state.keysetViewEnabled) requestUpdate();
+        });
+        document.getElementById('keycap-keyset-export-btn')?.addEventListener('click', exportKeysetSTL);
+
+        // updateModel に keyset 分岐を追加 (元の updateModel をラップ)
+        const _origUpdateModel = updateModel;
+        updateModel = function (opts) {
+            if (state.keysetViewEnabled) {
+                updateKeysetModel();
+                return;
+            }
+            return _origUpdateModel(opts);
+        };
+        if (typeof window !== 'undefined') {
+            window._kbsUpdateKeyset = updateKeysetModel;
+            window._kbsExportKeyset = exportKeysetSTL;
+        }
+
         // Phase 12-B: HarfBuzz WASM オプション初期化
         // 既定では読み込まない (~600KB)。複雑文字 (アラビア / インド / タイ / 合字) を
         // 正確にレイアウトしたい場合のみ、ユーザーが明示的に有効化する。
@@ -32401,8 +32645,7 @@ ${triangles.join('\n')}
             document.getElementById('keycap-stem-strength-btn')?.addEventListener('click', checkStemStrength);
             document.getElementById('keycap-clearance-btn')?.addEventListener('click', checkClearance);
             document.querySelectorAll('.keycap-row-btn').forEach(b => b.addEventListener('click', (e) => genRow(e.target.dataset.row)));
-            document.getElementById('keycap-theme-save-btn')?.addEventListener('click', saveTheme);
-            document.getElementById('keycap-theme-load-btn')?.addEventListener('click', listThemes);
+            // (theme save/load buttons removed)
             document.getElementById('keycap-safe-area-toggle')?.addEventListener('change', toggleSafeArea);
             document.getElementById('keycap-print-sheet-btn')?.addEventListener('click', exportPrintSheet);
         })();
