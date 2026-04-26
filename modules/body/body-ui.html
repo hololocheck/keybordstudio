@@ -55,6 +55,15 @@
     <button id="btn-kle-import" class="btn-small" style="margin-top:4px;">Import KLE Layout</button>
 </div>
 
+<div class="control-group" style="margin-top:10px; padding-top:10px; border-top:1px solid #333;">
+    <label data-i18n="body_lbl_pcb_import">PCB / Plate Import (DXF/SVG)</label>
+    <button id="body-pcb-import-btn" class="btn-small secondary"
+        style="width:100%; border-color:#ffb74d; color:#ffb74d;"
+        data-i18n="body_btn_pcb_import">PCB / プレート読込</button>
+    <div id="body-pcb-loaded-info" style="display:none; margin-top:6px; padding:6px 8px; background:rgba(255,183,77,0.08); border-left:3px solid #ffb74d; border-radius:3px; font-size:0.72rem; color:#ffe082;"></div>
+    <input type="file" id="body-pcb-file-input" accept=".dxf,.svg,.DXF,.SVG" style="display:none;">
+</div>
+
 <!-- Layout Studio Import -->
 <div class="control-group" style="margin-top:6px;">
     <label class="body-label">Layout Studio Import</label>
@@ -497,3 +506,27 @@
 <!-- Export Section -->
 <h3 id="sec-body-export" class="body-section-header">エクスポート</h3>
 <button id="btn-body-export" class="primary-3mf" style="width:100%; padding:12px; font-size:0.9rem; font-weight:bold;" data-hint="body_hint_export">エクスポート</button>
+
+<div class="control-group" style="margin-top:12px; padding-top:10px; border-top:1px solid #444;">
+    <button id="body-collision-check-btn" class="btn-small secondary"
+        style="width:100%; border-color:#ff7043; color:#ff7043;"
+        data-i18n="body_btn_collision_check">干渉チェック</button>
+    <div id="body-collision-result" style="display:none; margin-top:6px; padding:8px 10px; background:rgba(255,255,255,0.04); border-left:3px solid #ff7043; border-radius:3px; font-size:0.74rem; line-height:1.5; max-height:280px; overflow-y:auto;"></div>
+</div>
+
+<!-- Phase 7-3: ケース断面ビュー -->
+<h3 id="sec-body-cross-section" class="body-section-header" data-i18n="body_h_cross_section">ケース断面ビュー</h3>
+<div class="control-group">
+    <label class="toggle-switch"><input type="checkbox" id="body-cross-section-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="body_lbl_enable_cross_section">断面を表示</span></label>
+    <div class="control-row" style="margin-top:6px;">
+        <div style="flex:1"><label><span data-i18n="body_lbl_cross_section_axis">軸</span></label>
+            <select id="body-cross-section-axis" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
+                <option value="x" data-i18n="body_opt_axis_x">X 軸 (横)</option>
+                <option value="y" selected data-i18n="body_opt_axis_y">Y 軸 (高さ)</option>
+                <option value="z" data-i18n="body_opt_axis_z">Z 軸 (奥行き)</option>
+            </select>
+        </div>
+        <div style="flex:1"><label><span data-i18n="body_lbl_cross_section_pos">位置</span> <span id="v-body-cross-section-pos" class="val">0</span> mm</label><input type="range" id="body-cross-section-pos" min="-150" max="150" step="1" value="0"></div>
+    </div>
+    <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="body_cross_section_note">※ 表示専用機能です。STL/3MF 出力には影響しません。</p>
+</div>

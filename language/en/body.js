@@ -16,6 +16,8 @@ export const bodyEn = {
 
     // Layout
     body_lbl_layout_preset: "Layout Preset",
+    body_lbl_pcb_import: "PCB / Plate Import (DXF / SVG)",
+    body_btn_pcb_import: "Load PCB / Plate",
     body_lbl_layout_standard: "ISO / ANSI / JIS",
     body_lbl_pitch: "Key Switch Pitch",
     body_lbl_kle_import: "KLE Import",
@@ -92,5 +94,18 @@ export const bodyEn = {
     body_btn_ams_config: "AMS Color Settings (Slicer Sync)",
 
     // Export
-    body_btn_export: "Export"
+    body_btn_export: "Export",
+
+    // Collision Check (Phase 7-2)
+    body_btn_collision_check: "Run collision check",
+
+    // Cross-section (Phase 7-3)
+    body_h_cross_section: "Case Cross-Section",
+    body_lbl_enable_cross_section: "Show cross-section",
+    body_lbl_cross_section_axis: "Axis",
+    body_lbl_cross_section_pos: "Position",
+    body_opt_axis_x: "X axis (horizontal)",
+    body_opt_axis_y: "Y axis (height)",
+    body_opt_axis_z: "Z axis (depth)",
+    body_cross_section_note: "* Display only — does not affect STL/3MF export."
 };

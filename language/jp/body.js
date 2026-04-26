@@ -16,6 +16,8 @@ export const bodyJa = {
 
     // Layout
     body_lbl_layout_preset: "配列プリセット",
+    body_lbl_pcb_import: "PCB / プレート取込 (DXF / SVG)",
+    body_btn_pcb_import: "PCB / プレート読込",
     body_lbl_layout_standard: "ISO / ANSI / JIS",
     body_lbl_pitch: "キースイッチピッチ",
     body_lbl_kle_import: "KLE Import",
@@ -92,5 +94,18 @@ export const bodyJa = {
     body_btn_ams_config: "AMS色設定（スライサー同期用）",
 
     // Export
-    body_btn_export: "エクスポート"
+    body_btn_export: "エクスポート",
+
+    // Collision Check (Phase 7-2)
+    body_btn_collision_check: "干渉チェック実行",
+
+    // Cross-section (Phase 7-3)
+    body_h_cross_section: "ケース断面ビュー",
+    body_lbl_enable_cross_section: "断面を表示",
+    body_lbl_cross_section_axis: "軸",
+    body_lbl_cross_section_pos: "位置",
+    body_opt_axis_x: "X 軸 (横)",
+    body_opt_axis_y: "Y 軸 (高さ)",
+    body_opt_axis_z: "Z 軸 (奥行き)",
+    body_cross_section_note: "※ 表示専用機能です。STL/3MF 出力には影響しません。"
 };

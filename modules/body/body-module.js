@@ -82,6 +82,12 @@ const state = {
     // Custom layout from Layout Gallery
     customLayoutData: null,
     customLayoutName: null,
+    pcbImportName: null,    // PCB/プレートファイル名 (UI 表示用)
+    pcbImportData: null,    // パース済みオブジェクト { outline, switchHoles, screwHoles, source }
+    // Phase 7-3: ケース断面ビュー
+    crossSectionEnabled: false,
+    crossSectionAxis: 'y',
+    crossSectionPos: 0
 };
 
 // ── Body History System ───────────────────
@@ -1233,9 +1239,34 @@ function _createHolePathFromPoints(points, cx, cy) {
     return path;
 }
 
+// Phase 7-3: ケース断面ビュー — Body 用 clipping plane (Keycap 側とは独立)
+// renderer.localClippingEnabled は Phase 4-3 で main 側で true 化済みなので、
+// material 側で clippingPlanes を渡せばそのまま効く。
+let _bodyCrossSectionPlane = null;
+function _updateBodyCrossSectionPlane() {
+    if (typeof THREE === 'undefined') return;
+    if (!_bodyCrossSectionPlane) _bodyCrossSectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1000);
+    if (!state.crossSectionEnabled) {
+        _bodyCrossSectionPlane.normal.set(0, -1, 0);
+        _bodyCrossSectionPlane.constant = 1000;
+        return;
+    }
+    const pos = state.crossSectionPos || 0;
+    switch (state.crossSectionAxis) {
+        case 'x': _bodyCrossSectionPlane.normal.set(-1, 0, 0); _bodyCrossSectionPlane.constant = pos; break;
+        case 'z': _bodyCrossSectionPlane.normal.set(0, 0, -1); _bodyCrossSectionPlane.constant = pos; break;
+        default:  _bodyCrossSectionPlane.normal.set(0, -1, 0); _bodyCrossSectionPlane.constant = pos; break;
+    }
+}
+
 function mat(c) {
     const m = new THREE.MeshLambertMaterial({ color: c });
     if (state.displayMode === 'wireframe') { m.wireframe = true; }
+    if (state.crossSectionEnabled && _bodyCrossSectionPlane) {
+        m.clippingPlanes = [_bodyCrossSectionPlane];
+        m.side = THREE.DoubleSide;
+        m.clipShadows = true;
+    }
     return m;
 }
 
@@ -1468,6 +1499,9 @@ function applyCSGToPartMeshes(partTag, subPartTag, engraveGeo) {
 // ══════════════════════════════════════════════
 function updateModel() {
     if (!sceneGroup) return;
+
+    // Phase 7-3: 断面ビュー clipping plane を毎回更新 (state 反映)
+    _updateBodyCrossSectionPlane();
 
     // Dispose & clear (handles nested Groups from feet etc.)
     function disposeObj(obj) {
@@ -2577,6 +2611,42 @@ function bindUI() {
         });
     }
 
+    // Phase 7-1: PCB / プレート取込
+    const pcbBtn = document.getElementById('body-pcb-import-btn');
+    const pcbInput = document.getElementById('body-pcb-file-input');
+    if (pcbBtn && pcbInput) {
+        pcbBtn.addEventListener('click', () => pcbInput.click());
+        pcbInput.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const ext = file.name.split('.').pop().toLowerCase();
+                let parsed;
+                if (ext === 'dxf') {
+                    parsed = _parsePCBImportDXF(text);
+                } else if (ext === 'svg') {
+                    parsed = _parsePCBImportSVG(text);
+                } else {
+                    throw new Error('Unsupported format: ' + ext);
+                }
+                state.pcbImportName = file.name;
+                state.pcbImportData = parsed;
+                const info = document.getElementById('body-pcb-loaded-info');
+                if (info) {
+                    info.style.display = '';
+                    info.textContent = `${file.name} — outline: ${parsed.outline ? 'OK' : 'なし'} / switch holes: ${parsed.switchHoles?.length || 0} / screw holes: ${parsed.screwHoles?.length || 0}`;
+                }
+                requestBodyUpdate();
+                bodyCommitHistory();
+                if (showToast) showToast(`PCB/プレート読込完了: ${file.name}`);
+            } catch (err) {
+                console.error('PCB import error:', err);
+                if (showToast) showToast('PCB/プレート読込失敗: ' + (err.message || err));
+            }
+        });
+    }
+
     document.querySelectorAll('#mount-type-buttons .mount-option').forEach(o => {
         o.addEventListener('click', () => {
             document.querySelectorAll('#mount-type-buttons .mount-option').forEach(x => x.classList.remove('active'));
@@ -2775,6 +2845,23 @@ function bindUI() {
 
     // 統合エクスポートボタン
     document.getElementById('btn-body-export')?.addEventListener('click', () => showBodyExportDialog());
+
+    // Phase 7-3: ケース断面ビュー — トグル / 軸 / 位置スライダー
+    document.getElementById('body-cross-section-enabled')?.addEventListener('change', (e) => {
+        state.crossSectionEnabled = e.target.checked;
+        requestBodyUpdate();
+    });
+    document.getElementById('body-cross-section-axis')?.addEventListener('change', (e) => {
+        state.crossSectionAxis = e.target.value;
+        requestBodyUpdate();
+    });
+    const csPos = document.getElementById('body-cross-section-pos');
+    if (csPos) csPos.addEventListener('input', (e) => {
+        state.crossSectionPos = parseFloat(e.target.value);
+        const vEl = document.getElementById('v-body-cross-section-pos');
+        if (vEl) vEl.textContent = e.target.value;
+        requestBodyUpdate();
+    });
 }
 
 // ── Font Custom Dropdown (with hover preview) ─────────────
@@ -3961,6 +4048,194 @@ ${partsXml}  </object>
     return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
+// Phase 7-1: 簡易 DXF/SVG パーサー — PCB/プレートの外形・スイッチ穴・ネジ穴を抽出
+// 実用的な精度ではないが「読み込めた / 何が検出されたか」をユーザーに提示するには十分。
+function _parsePCBImportDXF(text) {
+    const result = { outline: [], switchHoles: [], screwHoles: [], source: 'dxf' };
+    const lines = text.split(/\r?\n/);
+    let i = 0;
+    let cx = 0, cy = 0, cr = 0;
+    while (i < lines.length) {
+        const code = lines[i]?.trim();
+        const val = lines[i + 1]?.trim();
+        if (code === '0' && val === 'CIRCLE') {
+            cx = 0; cy = 0; cr = 0;
+            // 次の数行で 10/20/40 (x/y/radius) を拾う
+            for (let j = i + 2; j < Math.min(i + 30, lines.length); j += 2) {
+                const c = lines[j]?.trim(), v = parseFloat(lines[j + 1]);
+                if (c === '10') cx = v;
+                else if (c === '20') cy = v;
+                else if (c === '40') cr = v;
+                else if (c === '0') { i = j - 2; break; }
+            }
+            if (cr > 0.5 && cr < 2.0) {
+                result.screwHoles.push({ x: cx, y: cy, r: cr });
+            } else if (cr >= 2.0 && cr < 8.0) {
+                result.switchHoles.push({ x: cx, y: cy, r: cr });
+            } else {
+                result.outline.push({ type: 'circle', x: cx, y: cy, r: cr });
+            }
+        } else if (code === '0' && val === 'LINE') {
+            let x1=0,y1=0,x2=0,y2=0;
+            for (let j = i + 2; j < Math.min(i + 30, lines.length); j += 2) {
+                const c = lines[j]?.trim(), v = parseFloat(lines[j + 1]);
+                if (c === '10') x1 = v;
+                else if (c === '20') y1 = v;
+                else if (c === '11') x2 = v;
+                else if (c === '21') y2 = v;
+                else if (c === '0') { i = j - 2; break; }
+            }
+            result.outline.push({ type: 'line', x1, y1, x2, y2 });
+        }
+        i += 2;
+    }
+    return result;
+}
+
+function _parsePCBImportSVG(text) {
+    const result = { outline: [], switchHoles: [], screwHoles: [], source: 'svg' };
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'image/svg+xml');
+    // <circle cx cy r>
+    doc.querySelectorAll('circle').forEach(c => {
+        const cx = parseFloat(c.getAttribute('cx') || '0');
+        const cy = parseFloat(c.getAttribute('cy') || '0');
+        const r = parseFloat(c.getAttribute('r') || '0');
+        if (r > 0.5 && r < 2.0) result.screwHoles.push({ x: cx, y: cy, r });
+        else if (r >= 2.0 && r < 8.0) result.switchHoles.push({ x: cx, y: cy, r });
+        else result.outline.push({ type: 'circle', x: cx, y: cy, r });
+    });
+    // <rect x y width height> — 14x14mm 付近はスイッチ穴扱い
+    doc.querySelectorAll('rect').forEach(r => {
+        const x = parseFloat(r.getAttribute('x') || '0');
+        const y = parseFloat(r.getAttribute('y') || '0');
+        const w = parseFloat(r.getAttribute('width') || '0');
+        const h = parseFloat(r.getAttribute('height') || '0');
+        if (Math.abs(w - 14) < 0.5 && Math.abs(h - 14) < 0.5) {
+            result.switchHoles.push({ x: x + w / 2, y: y + h / 2, r: w / 2 });
+        } else {
+            result.outline.push({ type: 'rect', x, y, w, h });
+        }
+    });
+    // <line x1 y1 x2 y2>
+    doc.querySelectorAll('line').forEach(ln => {
+        result.outline.push({
+            type: 'line',
+            x1: parseFloat(ln.getAttribute('x1') || '0'),
+            y1: parseFloat(ln.getAttribute('y1') || '0'),
+            x2: parseFloat(ln.getAttribute('x2') || '0'),
+            y2: parseFloat(ln.getAttribute('y2') || '0')
+        });
+    });
+    // <path d="..."> はそのまま outline に文字列として保持 (今回はジオメトリ詳細展開は省略)
+    doc.querySelectorAll('path').forEach(p => {
+        const d = p.getAttribute('d');
+        if (d) result.outline.push({ type: 'path', d });
+    });
+    return result;
+}
+
+// Phase 7-2: 内部干渉チェック — Body Generator のパラメトリックなパーツ間で
+// 寸法的に干渉しそうな組合せを bbox / 距離ベースで検出する。
+// 物理的なメッシュ交差ではなく state のスカラー値で判定する軽量チェック。
+function runBodyCollisionCheck() {
+    const issues = [];
+    const ok = [];
+    const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+    const t = (j, e) => isJa ? j : e;
+
+    const wall = state.wallThickness || 3.0;
+    const bezT = state.bezelTop || 5.0;
+    const bezB = state.bezelBottom || 8.0;
+    const bezS = state.bezelSide || 5.0;
+
+    // 壁厚とベゼルの整合性
+    if (wall > Math.min(bezT, bezB, bezS)) {
+        issues.push({ level: 'warn', msg: t(`壁厚 (${wall}mm) がベゼル (top:${bezT} / bottom:${bezB} / side:${bezS}mm) より大きく、PCB に干渉する可能性。`,
+            `Wall thickness (${wall}mm) exceeds bezel margins (top:${bezT} / bottom:${bezB} / side:${bezS}mm); may eat into PCB area.`) });
+    } else {
+        ok.push(t('壁厚はベゼル内に収まる', 'Wall thickness fits within bezel'));
+    }
+
+    // ガスケットマウント時のスペース
+    if (state.mountType === 'gasket') {
+        const gW = state.gasketW || 5.0;
+        const gT = state.gasketT || 2.5;
+        if (gW > Math.min(bezT, bezB) - wall) {
+            issues.push({ level: 'warn', msg: t(`ガスケットタブ幅 ${gW}mm が壁厚を引いた上下ベゼル (${Math.min(bezT, bezB) - wall}mm) を超えています。`,
+                `Gasket tab width ${gW}mm exceeds available bezel space (${Math.min(bezT, bezB) - wall}mm).`) });
+        }
+        if (gT > state.bottomThickness - 0.5) {
+            issues.push({ level: 'warn', msg: t(`ガスケット厚 ${gT}mm がボトム肉厚 ${state.bottomThickness}mm に対して厚すぎます。`,
+                `Gasket thickness ${gT}mm too close to bottom thickness ${state.bottomThickness}mm.`) });
+        }
+    }
+
+    // スタンドオフ vs 壁厚
+    if (state.mountType === 'tray') {
+        const standoffD = state.standoffD || 5.5;
+        if (standoffD > Math.min(bezT, bezS) * 2) {
+            issues.push({ level: 'info', msg: t(`スタンドオフ径 ${standoffD}mm が大きく、ベゼル内に余裕がない可能性。`,
+                `Standoff diameter ${standoffD}mm is large relative to bezels; tight fit.`) });
+        } else {
+            ok.push(t(`スタンドオフ径 ${standoffD}mm`, `Standoff diameter ${standoffD}mm`));
+        }
+        if (state.standoffH && state.standoffH < 3) {
+            issues.push({ level: 'warn', msg: t(`スタンドオフ高さ ${state.standoffH}mm が低く、ネジ山が十分にかからない可能性。`,
+                `Standoff height ${state.standoffH}mm is low; thread may not bite enough.`) });
+        }
+    }
+
+    // USB ポート位置
+    const usbX = state.usbPosX != null ? state.usbPosX : 50;
+    const usbY = state.usbPosY != null ? state.usbPosY : 50;
+    if (usbX < 5 || usbX > 95 || usbY < 5 || usbY > 95) {
+        issues.push({ level: 'warn', msg: t(`USB ポート位置 (X:${usbX}, Y:${usbY}) が端に近すぎ、フィレットや角丸と干渉する可能性。`,
+            `USB position (X:${usbX}, Y:${usbY}) is too close to the edge; may clash with corner radius.`) });
+    } else {
+        ok.push(t(`USB ポート位置 OK`, `USB position OK`));
+    }
+    const portMargin = state.portMargin != null ? state.portMargin : 0.5;
+    if (portMargin < 0.2) {
+        issues.push({ level: 'warn', msg: t(`USB 開口マージン ${portMargin}mm がきつく、ケーブル抜き差しに影響する可能性。`,
+            `USB port margin ${portMargin}mm is tight; may affect cable insertion.`) });
+    }
+
+    // バッテリースペース
+    if (state.batterySpace) {
+        if (state.bottomThickness < 4) {
+            issues.push({ level: 'warn', msg: t(`バッテリースペース ON で底厚が ${state.bottomThickness}mm と薄く、配線スペースが不足する可能性。`,
+                `Battery space ON but bottom thickness ${state.bottomThickness}mm is thin; routing room may be limited.`) });
+        }
+        ok.push(t('バッテリースペース有効', 'Battery space enabled'));
+    }
+
+    // PCB クリアランス
+    const clr = state.pcbClearance != null ? state.pcbClearance : 3.0;
+    if (clr < 1.0) {
+        issues.push({ level: 'err', msg: t(`PCB クリアランス ${clr}mm が小さすぎ、PCB が壁にぶつかる可能性大。`,
+            `PCB clearance ${clr}mm is too small; PCB will likely hit the wall.`) });
+    } else if (clr < 2.0) {
+        issues.push({ level: 'warn', msg: t(`PCB クリアランス ${clr}mm はやや小さめ。基板の許容差を確認してください。`,
+            `PCB clearance ${clr}mm is borderline; verify board tolerance.`) });
+    } else {
+        ok.push(t(`PCB クリアランス ${clr}mm`, `PCB clearance ${clr}mm`));
+    }
+
+    // アドオン併用
+    const addons = [];
+    if (state.encoder) addons.push('encoder');
+    if (state.oled) addons.push('OLED');
+    if (state.tripod) addons.push('tripod');
+    if (addons.length >= 2 && state.layout === '40') {
+        issues.push({ level: 'info', msg: t(`小型レイアウト (40%) に複数アドオン (${addons.join(', ')}) を載せています。配置スペースに注意。`,
+            `Small layout (40%) with multiple add-ons (${addons.join(', ')}); space may be tight.`) });
+    }
+    if (addons.length > 0) ok.push(t(`アドオン: ${addons.join(', ')}`, `Add-ons: ${addons.join(', ')}`));
+
+    return { issues, ok };
+}
+
 // ── Public API ─────────────────────────────
 export const BodyModule = {
     id: MODULE_ID, name: MODULE_NAME,
@@ -4099,6 +4374,36 @@ export const BodyModule = {
         // フローティングコントロールの再配置
         if (window.updateFloatingControlsLayout) {
             requestAnimationFrame(window.updateFloatingControlsLayout);
+        }
+
+        // Phase 7-2: 内部干渉チェック ボタン
+        const collBtn = document.getElementById('body-collision-check-btn');
+        if (collBtn) {
+            collBtn.addEventListener('click', () => {
+                const r = runBodyCollisionCheck();
+                const out = document.getElementById('body-collision-result');
+                if (!out) return;
+                const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                const lvlIcon = { err: '❌', warn: '⚠️', info: 'ℹ️' };
+                const lvlColor = { err: '#ff5252', warn: '#ffb74d', info: '#4fc3f7' };
+                let html = '';
+                if (r.issues.length === 0) {
+                    html += `<div style="color:#69f0ae; font-weight:bold;">${isJa ? '✅ 干渉なし' : '✅ No collisions'}</div>`;
+                } else {
+                    html += `<div style="color:#ff9800; font-weight:bold; margin-bottom:6px;">${isJa ? `指摘 ${r.issues.length} 件` : `${r.issues.length} issues`}</div><ul style="list-style:none; padding:0; margin:0;">`;
+                    for (const i of r.issues) {
+                        html += `<li style="padding:4px 6px; margin-bottom:3px; border-left:3px solid ${lvlColor[i.level]}; background:rgba(255,255,255,0.03);"><span style="margin-right:4px;">${lvlIcon[i.level]}</span>${i.msg}</li>`;
+                    }
+                    html += '</ul>';
+                }
+                if (r.ok.length > 0) {
+                    html += `<details style="margin-top:6px;"><summary style="cursor:pointer; color:#69f0ae; font-size:0.72rem;">✓ ${isJa ? `OK 項目 (${r.ok.length})` : `Passing (${r.ok.length})`}</summary><ul style="list-style:none; padding:4px 0 0 12px; margin:0; font-size:0.7rem; color:#aaa;">`;
+                    for (const o of r.ok) html += `<li>✓ ${o}</li>`;
+                    html += '</ul></details>';
+                }
+                out.innerHTML = html;
+                out.style.display = '';
+            });
         }
 
         // ガムボール委譲: Body テキスト用ターゲット
