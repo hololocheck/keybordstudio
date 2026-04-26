@@ -56,6 +56,9 @@ export const keycapEn = {
     h_strap_hole: "Strap Hole", lbl_enable_strap_hole: "Cut strap hole",
     lbl_strap_hole_diameter: "Diameter", lbl_strap_hole_shape: "Shape",
     opt_strap_circle: "Circle", opt_strap_slot: "Slot",
+    lbl_strap_hole_face: "Face",
+    opt_face_top: "Top", opt_face_front: "Front", opt_face_back: "Back",
+    opt_face_left: "Left", opt_face_right: "Right",
     lbl_strap_hole_x: "Pos X", lbl_strap_hole_z: "Pos Z",
     lbl_strap_hole_length: "Slot length", lbl_strap_hole_angle: "Rotation",
 

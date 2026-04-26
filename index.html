@@ -8960,7 +8960,15 @@
                     <div class="control-group" data-hint="hint_strap_hole">
                         <label class="toggle-switch"><input type="checkbox" id="strap-hole-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_enable_strap_hole">ストラップ穴を開ける</span></label>
                         <div class="control-row" style="margin-top:6px;">
-                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_diameter">穴径</span> <span id="v-strap-hole-diameter" class="val" data-target="strap-hole-diameter">3.0</span> mm</label><input type="range" id="strap-hole-diameter" min="1" max="8" step="0.1" value="3.0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_face">面</span></label>
+                                <select id="strap-hole-face" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
+                                    <option value="top" data-i18n="opt_face_top">上面</option>
+                                    <option value="front" data-i18n="opt_face_front">前面</option>
+                                    <option value="back" data-i18n="opt_face_back">後面</option>
+                                    <option value="left" data-i18n="opt_face_left">左面</option>
+                                    <option value="right" data-i18n="opt_face_right">右面</option>
+                                </select>
+                            </div>
                             <div style="flex:1"><label><span data-i18n="lbl_strap_hole_shape">形状</span></label>
                                 <select id="strap-hole-shape" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
                                     <option value="circle" data-i18n="opt_strap_circle">円</option>
@@ -8969,8 +8977,12 @@
                             </div>
                         </div>
                         <div class="control-row">
-                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_x">位置 X</span> <span id="v-strap-hole-x" class="val" data-target="strap-hole-x">0.0</span></label><input type="range" id="strap-hole-x" min="-15" max="15" step="0.1" value="0"></div>
-                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_z">位置 Z</span> <span id="v-strap-hole-z" class="val" data-target="strap-hole-z">0.0</span></label><input type="range" id="strap-hole-z" min="-15" max="15" step="0.1" value="0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_diameter">穴径</span> <span id="v-strap-hole-diameter" class="val" data-target="strap-hole-diameter">3.0</span> mm</label><input type="range" id="strap-hole-diameter" min="1" max="8" step="0.1" value="3.0"></div>
+                            <div style="flex:1"></div>
+                        </div>
+                        <div class="control-row">
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_x" id="lbl-strap-hole-x">位置 X</span> <span id="v-strap-hole-x" class="val" data-target="strap-hole-x">0.0</span></label><input type="range" id="strap-hole-x" min="-15" max="15" step="0.1" value="0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_z" id="lbl-strap-hole-z">位置 Z</span> <span id="v-strap-hole-z" class="val" data-target="strap-hole-z">0.0</span></label><input type="range" id="strap-hole-z" min="-15" max="15" step="0.1" value="0"></div>
                         </div>
                         <div class="control-row" id="strap-hole-slot-row" style="display:none;">
                             <div style="flex:1"><label><span data-i18n="lbl_strap_hole_length">長穴の長さ</span> <span id="v-strap-hole-length" class="val" data-target="strap-hole-length">5.0</span> mm</label><input type="range" id="strap-hole-length" min="1" max="15" step="0.1" value="5.0"></div>
@@ -12215,11 +12227,12 @@ result
             customHeight: 9.5, customAngle: 3,
             // ストラップ穴: ペンダント・キーホルダー用途で keycap に貫通穴を空ける
             strapHoleEnabled: false,
+            strapHoleFace: 'top',     // 'top' | 'front' | 'back' | 'left' | 'right'
             strapHoleShape: 'circle', // 'circle' | 'slot'
             strapHoleDiameter: 3.0,
-            strapHoleX: 0, strapHoleZ: 0,
-            strapHoleLength: 5.0,    // slot 形状時の長さ
-            strapHoleAngle: 0        // slot 形状時の Y 軸回転 (度)
+            strapHoleX: 0, strapHoleZ: 0, // 面ローカルの U / V (top: X/Z, side: 横/高さ)
+            strapHoleLength: 5.0,     // slot 形状時の長さ
+            strapHoleAngle: 0         // slot 形状時の貫通軸まわり回転 (度)
         };
         let state = JSON.parse(JSON.stringify(initialState));
         let importedModelBuffer = null;
@@ -18231,29 +18244,72 @@ ${componentsXml}      </components>
                 importedGeo = null;
             }
 
-            // ストラップ穴: ペンダント／キーホルダー用に keycap を貫通する穴を空ける。
-            // - 円形: CylinderGeometry (Y軸貫通)
-            // - 長穴: CapsuleGeometry を rotateZ で X軸方向に倒し、Y軸まわりに角度回転
-            // light モードでは CSG をスキップし半透明シリンダー/カプセルでプレビュー（位置確認用）。
+            // ストラップ穴: keycap の上面または4側面（前/後/左/右）に貫通穴を空ける。
+            // 内部処理:
+            //   1. 円柱 or カプセルを生成（CapsuleGeometry / CylinderGeometry はデフォルト Y軸長手）
+            //   2. slot の場合は壁の水平方向に長手を倒す
+            //      - top / front / back: 長手 X 軸 (rotateZ π/2)
+            //      - left / right:       長手 Z 軸 (rotateX π/2)
+            //   3. 貫通軸を世界座標で合わせる
+            //      - top:        Y 軸貫通 (回転なし)
+            //      - front/back: Z 軸貫通 (rotateX π/2 で Y→Z)
+            //      - left/right: X 軸貫通 (rotateZ π/2 で Y→X、ただし slot の長手は既に Z なので保持)
+            //   4. 貫通軸まわりの角度回転 (slot のみ意味あり)
+            //   5. 面ローカル UV (state.strapHoleX / strapHoleZ) を世界座標へマップして translate
+            // light モードでは CSG をスキップし半透明シリンダー/カプセルでプレビュー。
             let _lightStrapHolePreview = null;
             if (state.strapHoleEnabled && finalKeycapGeo) {
                 const radius = Math.max(0.5, (state.strapHoleDiameter || 3) / 2);
+                const face = state.strapHoleFace || 'top';
+                const angleRad = THREE.MathUtils.degToRad(state.strapHoleAngle || 0);
+                const u = state.strapHoleX || 0;
+                const v = state.strapHoleZ || 0;
+                const isSlot = state.strapHoleShape === 'slot';
                 let holeGeo;
-                if (state.strapHoleShape === 'slot') {
-                    const slotLen = Math.max(radius * 2, state.strapHoleLength || 5);
+                if (isSlot) {
+                    const slotLen = Math.max(radius * 2 + 0.01, state.strapHoleLength || 5);
                     const cylPart = Math.max(0, slotLen - radius * 2);
                     if (typeof THREE.CapsuleGeometry === 'function') {
                         holeGeo = new THREE.CapsuleGeometry(radius, cylPart, 6, 16);
                     } else {
-                        // 互換性フォールバック: 細長い箱で代用
                         holeGeo = new THREE.BoxGeometry(slotLen, 200, radius * 2);
                     }
-                    holeGeo.rotateZ(Math.PI / 2); // 長手を X 軸方向に
-                    holeGeo.rotateY(THREE.MathUtils.degToRad(state.strapHoleAngle || 0));
+                    // 長手を「壁の水平方向」へ倒す
+                    if (face === 'left' || face === 'right') {
+                        holeGeo.rotateX(Math.PI / 2);   // 長手 Y → Z, 貫通軸は X 系
+                    } else {
+                        holeGeo.rotateZ(Math.PI / 2);   // 長手 Y → X, 貫通軸は Y 系
+                    }
                 } else {
+                    // 円形は軸対称なので長手回転は不要
                     holeGeo = new THREE.CylinderGeometry(radius, radius, 200, 32);
                 }
-                holeGeo.translate(state.strapHoleX || 0, 0, state.strapHoleZ || 0);
+                // 貫通軸を面に合わせる
+                if (face === 'front' || face === 'back') {
+                    holeGeo.rotateX(Math.PI / 2);       // Y 軸貫通 → Z 軸貫通
+                } else if ((face === 'left' || face === 'right') && !isSlot) {
+                    holeGeo.rotateZ(Math.PI / 2);       // Y 軸貫通 → X 軸貫通 (slot は既に Z 長手 / X 貫通)
+                }
+                // 貫通軸まわりの角度回転（slot のみ意味あり）
+                if (isSlot && angleRad !== 0) {
+                    if (face === 'top') holeGeo.rotateY(angleRad);
+                    else if (face === 'front' || face === 'back') holeGeo.rotateZ(angleRad);
+                    else holeGeo.rotateX(angleRad);
+                }
+                // 面ローカル UV → 世界座標
+                switch (face) {
+                    case 'top':
+                        holeGeo.translate(u, 0, v);              // u=X, v=Z
+                        break;
+                    case 'front':
+                    case 'back':
+                        holeGeo.translate(u, v, 0);              // u=X, v=Y(高さ)
+                        break;
+                    case 'left':
+                    case 'right':
+                        holeGeo.translate(0, v, u);              // u=Z(奥行き), v=Y(高さ)
+                        break;
+                }
                 if (light) {
                     _lightStrapHolePreview = holeGeo;
                 } else {
@@ -22334,6 +22390,34 @@ ${mesh.triangles.join('\n')}
                 const slotRow = document.getElementById('strap-hole-slot-row');
                 if (slotRow) slotRow.style.display = (state.strapHoleShape === 'slot') ? '' : 'none';
             });
+            // 面切替: 上面 / 前面 / 後面 / 左面 / 右面
+            // 位置スライダー (X / Z) のラベルは面ローカル座標として動的に変更する。
+            //   top:  X=横 / Z=奥行き  → そのまま「位置 X / 位置 Z」
+            //   side: X=横 / Z=高さ    → 「位置 X (横) / 位置 Y (高さ)」のように表示
+            function _updateStrapHoleLabels() {
+                const lblX = document.getElementById('lbl-strap-hole-x');
+                const lblZ = document.getElementById('lbl-strap-hole-z');
+                if (!lblX || !lblZ) return;
+                const face = state.strapHoleFace || 'top';
+                const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                if (face === 'top') {
+                    lblX.textContent = isJa ? '位置 X' : 'Pos X';
+                    lblZ.textContent = isJa ? '位置 Z' : 'Pos Z';
+                } else if (face === 'front' || face === 'back') {
+                    lblX.textContent = isJa ? '位置 X (横)' : 'Pos X (horizontal)';
+                    lblZ.textContent = isJa ? '位置 Y (高さ)' : 'Pos Y (height)';
+                } else { // left / right
+                    lblX.textContent = isJa ? '位置 Z (奥行き)' : 'Pos Z (depth)';
+                    lblZ.textContent = isJa ? '位置 Y (高さ)' : 'Pos Y (height)';
+                }
+            }
+            document.getElementById('strap-hole-face')?.addEventListener('change', (e) => {
+                state.strapHoleFace = e.target.value;
+                _updateStrapHoleLabels();
+                requestUpdate();
+            });
+            // 言語切替時にもラベルを再計算したいので外部から呼べるよう公開
+            if (typeof window !== 'undefined') window._updateStrapHoleLabels = _updateStrapHoleLabels;
             // render-mode select removed - wireframe toggle handled by HUD button
             document.getElementById('stabilizer-type').addEventListener('change', (e) => {
                 state.stabilizerType = e.target.value;

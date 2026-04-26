@@ -57,6 +57,9 @@ export const keycapJa = {
     h_strap_hole: "ストラップ穴", lbl_enable_strap_hole: "ストラップ穴を開ける",
     lbl_strap_hole_diameter: "穴径", lbl_strap_hole_shape: "形状",
     opt_strap_circle: "円", opt_strap_slot: "長穴",
+    lbl_strap_hole_face: "面",
+    opt_face_top: "上面", opt_face_front: "前面", opt_face_back: "後面",
+    opt_face_left: "左面", opt_face_right: "右面",
     lbl_strap_hole_x: "位置 X", lbl_strap_hole_z: "位置 Z",
     lbl_strap_hole_length: "長穴の長さ", lbl_strap_hole_angle: "回転",
 
