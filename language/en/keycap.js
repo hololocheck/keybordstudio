@@ -52,6 +52,13 @@ export const keycapEn = {
     // SVG Settings
     h_svg: "SVG Icon Settings", btn_upload_svg: "Load SVG", btn_svg_manager: "Open SVG Manager", cat_custom: "Custom", lbl_visible: "Visible",
 
+    // Strap Hole
+    h_strap_hole: "Strap Hole", lbl_enable_strap_hole: "Cut strap hole",
+    lbl_strap_hole_diameter: "Diameter", lbl_strap_hole_shape: "Shape",
+    opt_strap_circle: "Circle", opt_strap_slot: "Slot",
+    lbl_strap_hole_x: "Pos X", lbl_strap_hole_z: "Pos Z",
+    lbl_strap_hole_length: "Slot length", lbl_strap_hole_angle: "Rotation",
+
     // Font Manager
     fm_title: "Font Manager", fm_load_font: "Load Fonts", fm_drop_hint: "Click / D&amp;D<br><span style='font-size:0.55rem;color:#556;'>.ttf .otf .woff .json (multiple OK)</span>", fm_loaded_fonts: "Loaded Fonts", fm_search_placeholder: "Search fonts...", fm_empty: "Load fonts<br>to begin", fm_clear_all: "Delete All Saved", fm_lbl_fontname: "Font Name", fm_lbl_format: "Format", fm_lbl_glyphs: "Glyphs", fm_lbl_kerning: "Kerning", fm_lbl_errors: "Errors", fm_close: "Close", fm_use_save: "Use & Save", fm_font_info: "Font Info",
 

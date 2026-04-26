@@ -53,6 +53,13 @@ export const keycapJa = {
     // SVG Settings
     h_svg: "SVGアイコン設定", btn_upload_svg: "SVG読込", btn_svg_manager: "SVGマネージャーを開く", cat_custom: "カスタム", lbl_visible: "表示",
 
+    // ストラップ穴
+    h_strap_hole: "ストラップ穴", lbl_enable_strap_hole: "ストラップ穴を開ける",
+    lbl_strap_hole_diameter: "穴径", lbl_strap_hole_shape: "形状",
+    opt_strap_circle: "円", opt_strap_slot: "長穴",
+    lbl_strap_hole_x: "位置 X", lbl_strap_hole_z: "位置 Z",
+    lbl_strap_hole_length: "長穴の長さ", lbl_strap_hole_angle: "回転",
+
     // Font Manager
     fm_title: "フォントマネージャー", fm_load_font: "フォント読み込み", fm_drop_hint: "クリック / D&amp;D<br><span style='font-size:0.55rem;color:#556;'>.ttf .otf .woff .json（複数選択可）</span>", fm_loaded_fonts: "読み込み済みフォント", fm_search_placeholder: "フォント検索...", fm_empty: "フォントを<br>読み込んでください", fm_clear_all: "保存フォント全削除", fm_lbl_fontname: "フォント名", fm_lbl_format: "形式", fm_lbl_glyphs: "グリフ数", fm_lbl_kerning: "カーニング", fm_lbl_errors: "エラー", fm_close: "閉じる", fm_use_save: "使用 ＆ 保存", fm_font_info: "フォント情報",
 

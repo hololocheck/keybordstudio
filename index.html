@@ -8956,6 +8956,28 @@
                                 class="val">0.0</span></label><input type="range" id="svg-offset-y" min="-5.0" max="5.0"
                             step="0.01" value="0.0"></div>
 
+                    <h3 id="sec-strap-hole" data-i18n="h_strap_hole">ストラップ穴</h3>
+                    <div class="control-group" data-hint="hint_strap_hole">
+                        <label class="toggle-switch"><input type="checkbox" id="strap-hole-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_enable_strap_hole">ストラップ穴を開ける</span></label>
+                        <div class="control-row" style="margin-top:6px;">
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_diameter">穴径</span> <span id="v-strap-hole-diameter" class="val" data-target="strap-hole-diameter">3.0</span> mm</label><input type="range" id="strap-hole-diameter" min="1" max="8" step="0.1" value="3.0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_shape">形状</span></label>
+                                <select id="strap-hole-shape" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
+                                    <option value="circle" data-i18n="opt_strap_circle">円</option>
+                                    <option value="slot" data-i18n="opt_strap_slot">長穴</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_x">位置 X</span> <span id="v-strap-hole-x" class="val" data-target="strap-hole-x">0.0</span></label><input type="range" id="strap-hole-x" min="-15" max="15" step="0.1" value="0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_z">位置 Z</span> <span id="v-strap-hole-z" class="val" data-target="strap-hole-z">0.0</span></label><input type="range" id="strap-hole-z" min="-15" max="15" step="0.1" value="0"></div>
+                        </div>
+                        <div class="control-row" id="strap-hole-slot-row" style="display:none;">
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_length">長穴の長さ</span> <span id="v-strap-hole-length" class="val" data-target="strap-hole-length">5.0</span> mm</label><input type="range" id="strap-hole-length" min="1" max="15" step="0.1" value="5.0"></div>
+                            <div style="flex:1"><label><span data-i18n="lbl_strap_hole_angle">回転</span> <span id="v-strap-hole-angle" class="val" data-target="strap-hole-angle">0</span>°</label><input type="range" id="strap-hole-angle" min="-90" max="90" step="5" value="0"></div>
+                        </div>
+                    </div>
+
                     <h3 id="sec-color" data-i18n="h_colors">色設定</h3>
 
                     <!-- V67: AMS連携カラーパレット (ドロップダウン統合) -->
@@ -12190,7 +12212,14 @@ result
             keyShapeType: 'rectangle', polygonSides: 6, starPoints: 5, starInner: 0.5,
             isoTopWidth: 1.5, isoBottomWidth: 1.25, isoHeight: 2.0,
             isoStemX: 2.4, isoStemZ: 0, isoStabTopZ: -12, isoStabBottomZ: 12,
-            customHeight: 9.5, customAngle: 3
+            customHeight: 9.5, customAngle: 3,
+            // ストラップ穴: ペンダント・キーホルダー用途で keycap に貫通穴を空ける
+            strapHoleEnabled: false,
+            strapHoleShape: 'circle', // 'circle' | 'slot'
+            strapHoleDiameter: 3.0,
+            strapHoleX: 0, strapHoleZ: 0,
+            strapHoleLength: 5.0,    // slot 形状時の長さ
+            strapHoleAngle: 0        // slot 形状時の Y 軸回転 (度)
         };
         let state = JSON.parse(JSON.stringify(initialState));
         let importedModelBuffer = null;
@@ -12322,6 +12351,8 @@ result
             'svg-scale': 'svgScale', 'svg-thickness': 'svgThickness',
             'svg-rot-x': 'svgRotX', 'svg-rot-y': 'svgRotY', 'svg-rot-z': 'svgRotZ',
             'svg-offset-y': 'svgOffsetY', 'svg-pos-x': 'svgPosX', 'svg-pos-z': 'svgPosZ',
+            'strap-hole-diameter': 'strapHoleDiameter', 'strap-hole-x': 'strapHoleX', 'strap-hole-z': 'strapHoleZ',
+            'strap-hole-length': 'strapHoleLength', 'strap-hole-angle': 'strapHoleAngle',
             'text2-size': 'text2Size', 'text2-x': 'text2X', 'text2-z': 'text2Z',
             'side-size': 'sideSize', 'side-y': 'sideY', 'side-rot': 'sideRot',
             'side-text': 'sideText',
@@ -12344,7 +12375,8 @@ result
             'lock-thickness': 'textThicknessLocked', 'text-conform': 'textConform', 'svg-conform': 'svgConform',
             'enable-text2': 'enableText2', 'enable-side': 'enableSide', 'model-visible': 'modelVisible',
             'enable-stem-extension': 'enableStemExtension', 'box-stem': 'boxStem', 'lego-stud': 'legoStud',
-            'img-texture-visible': 'imgTextureVisible', 'texture-global': 'textureGlobal'
+            'img-texture-visible': 'imgTextureVisible', 'texture-global': 'textureGlobal',
+            'strap-hole-enabled': 'strapHoleEnabled'
         };
 
         function commitHistory() { if (historyIndex < history.length - 1) history.splice(historyIndex + 1); history.push(JSON.parse(JSON.stringify(state))); historyIndex++; if (history.length > 50) { history.shift(); historyIndex--; } updateHistoryBtns(); }
@@ -18199,6 +18231,37 @@ ${componentsXml}      </components>
                 importedGeo = null;
             }
 
+            // ストラップ穴: ペンダント／キーホルダー用に keycap を貫通する穴を空ける。
+            // - 円形: CylinderGeometry (Y軸貫通)
+            // - 長穴: CapsuleGeometry を rotateZ で X軸方向に倒し、Y軸まわりに角度回転
+            // light モードでは CSG をスキップし半透明シリンダー/カプセルでプレビュー（位置確認用）。
+            let _lightStrapHolePreview = null;
+            if (state.strapHoleEnabled && finalKeycapGeo) {
+                const radius = Math.max(0.5, (state.strapHoleDiameter || 3) / 2);
+                let holeGeo;
+                if (state.strapHoleShape === 'slot') {
+                    const slotLen = Math.max(radius * 2, state.strapHoleLength || 5);
+                    const cylPart = Math.max(0, slotLen - radius * 2);
+                    if (typeof THREE.CapsuleGeometry === 'function') {
+                        holeGeo = new THREE.CapsuleGeometry(radius, cylPart, 6, 16);
+                    } else {
+                        // 互換性フォールバック: 細長い箱で代用
+                        holeGeo = new THREE.BoxGeometry(slotLen, 200, radius * 2);
+                    }
+                    holeGeo.rotateZ(Math.PI / 2); // 長手を X 軸方向に
+                    holeGeo.rotateY(THREE.MathUtils.degToRad(state.strapHoleAngle || 0));
+                } else {
+                    holeGeo = new THREE.CylinderGeometry(radius, radius, 200, 32);
+                }
+                holeGeo.translate(state.strapHoleX || 0, 0, state.strapHoleZ || 0);
+                if (light) {
+                    _lightStrapHolePreview = holeGeo;
+                } else {
+                    finalKeycapGeo = _csgCachedSubtract(finalKeycapGeo, holeGeo);
+                    if (holeGeo.dispose) holeGeo.dispose();
+                }
+            }
+
             // Engrave 用 CSG はパイプラインで最も重い箇所。light モードでは実行せず、
             // 暫定的に半透明オーバーレイで「文字位置と大きさ」だけ示す。
             // 操作停止後の heavy update で正式な凹み形状に置き換わる。
@@ -18262,6 +18325,19 @@ ${componentsXml}      </components>
                 const lightMesh = new THREE.Mesh(_lightEngravePreview, lightMat);
                 lightMesh.name = "KeycapEngrave-preview";
                 mainGroup.add(lightMesh);
+            }
+            // light モード時のストラップ穴プレビュー（赤色半透明シリンダ）
+            if (_lightStrapHolePreview) {
+                const holeMat = new THREE.MeshStandardMaterial({
+                    color: 0xff5c5c,
+                    roughness: 0.7,
+                    transparent: true,
+                    opacity: 0.45,
+                    side: THREE.DoubleSide
+                });
+                const holeMesh = new THREE.Mesh(_lightStrapHolePreview, holeMat);
+                holeMesh.name = "StrapHole-preview";
+                mainGroup.add(holeMesh);
             }
 
             // 非同期 CSG: Worker に減算を依頼し、結果が来たら KeycapBody の geometry を差し替える
@@ -22245,6 +22321,18 @@ ${mesh.triangles.join('\n')}
             document.getElementById('svg-mode')?.addEventListener('change', (e) => {
                 state.svgMode = e.target.value;
                 requestUpdate();
+            });
+            // ストラップ穴: 形状切替 (円形 / 長穴)。長穴選択時のみ追加スライダーを表示
+            document.getElementById('strap-hole-shape')?.addEventListener('change', (e) => {
+                state.strapHoleShape = e.target.value;
+                const slotRow = document.getElementById('strap-hole-slot-row');
+                if (slotRow) slotRow.style.display = (e.target.value === 'slot') ? '' : 'none';
+                requestUpdate();
+            });
+            // 有効化トグルが ON になった瞬間にスロット表示を整合
+            document.getElementById('strap-hole-enabled')?.addEventListener('change', () => {
+                const slotRow = document.getElementById('strap-hole-slot-row');
+                if (slotRow) slotRow.style.display = (state.strapHoleShape === 'slot') ? '' : 'none';
             });
             // render-mode select removed - wireframe toggle handled by HUD button
             document.getElementById('stabilizer-type').addEventListener('change', (e) => {
