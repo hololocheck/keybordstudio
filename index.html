@@ -6458,6 +6458,81 @@
         }
 
         /* ===========================================================
+         * Phase 6-1: Workflow Guide
+         * 制作フロー誘導: Layout → Body → Keycap → Export
+         * =========================================================== */
+        #workflow-guide {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            width: 100%;
+            padding: 6px 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border: 1px solid #2a2a3e;
+            box-sizing: border-box;
+        }
+        .wf-step {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid transparent;
+            color: #888;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .wf-step:hover {
+            background: rgba(0, 229, 255, 0.08);
+            color: #b2ebf2;
+        }
+        .wf-step.wf-active {
+            background: linear-gradient(135deg, rgba(0,229,255,0.18), rgba(0,229,255,0.08));
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(0,229,255,0.25);
+        }
+        .wf-step.wf-done {
+            color: #69f0ae;
+            border-color: rgba(105,240,174,0.3);
+            background: rgba(105,240,174,0.08);
+        }
+        .wf-step.wf-done .wf-num::before {
+            content: '✓';
+            margin-right: 2px;
+        }
+        .wf-step.wf-todo {
+            color: #555;
+        }
+        .wf-num {
+            display: inline-block;
+            min-width: 12px;
+            font-weight: bold;
+            opacity: 0.85;
+        }
+        .wf-arrow {
+            color: #444;
+            font-size: 0.85rem;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        @media (max-width: 1024px) {
+            .wf-label { display: none; }
+            .wf-arrow { font-size: 0.7rem; }
+            .wf-step { padding: 6px 2px; min-width: 28px; }
+        }
+
+        /* ===========================================================
          * Large-display & ultrawide responsive layer (V1.1)
          * 既存の max-width 系メディアクエリはタブレット/小型ノート向け。
          * 以下は FHD/4K/ウルトラワイドで「余白だらけ」「文字が小さすぎ」になる
@@ -8117,6 +8192,30 @@
             </div>
 
             <div id="nav-bar">
+                <!-- Phase 6-1: 制作フロー誘導 (Layout → Body → Keycap → Export) -->
+                <div class="nav-row" id="workflow-guide-row">
+                    <div id="workflow-guide" data-hint="hint_workflow_guide">
+                        <button class="wf-step" data-step="layout" data-module="layout" title="">
+                            <span class="wf-num">1</span>
+                            <span class="wf-label" data-i18n="wf_step_layout">レイアウト</span>
+                        </button>
+                        <span class="wf-arrow">→</span>
+                        <button class="wf-step" data-step="body" data-module="body" title="">
+                            <span class="wf-num">2</span>
+                            <span class="wf-label" data-i18n="wf_step_body">ボディ</span>
+                        </button>
+                        <span class="wf-arrow">→</span>
+                        <button class="wf-step" data-step="keycap" data-module="keycap" title="">
+                            <span class="wf-num">3</span>
+                            <span class="wf-label" data-i18n="wf_step_keycap">キーキャップ</span>
+                        </button>
+                        <span class="wf-arrow">→</span>
+                        <button class="wf-step" data-step="export" data-action="export" title="">
+                            <span class="wf-num">4</span>
+                            <span class="wf-label" data-i18n="wf_step_export">出力</span>
+                        </button>
+                    </div>
+                </div>
                 <div class="nav-row" id="module-select-row">
                     <select id="module-select">
                         <option value="keycap" data-i18n="mod_keycap">⌨ Keycap Studio</option>
@@ -31394,7 +31493,105 @@ ${triangles.join('\n')}
 
         document.getElementById('module-select')?.addEventListener('change', (e) => {
             switchModule(e.target.value);
+            _refreshWorkflowGuide();
         });
+
+        // Phase 6-1: ワークフローガイドの状態更新
+        // - 各ステップの状態を「done / active / todo」のいずれかで分類
+        //   - done   = ユーザーが意図的に何か作業した形跡がある
+        //   - active = 現在編集中のモジュール
+        //   - todo   = まだ未着手
+        // - クリックで対応モジュールに切替、または出力ステップは export ボタンを発火
+        function _isLayoutDone() {
+            try {
+                if (window._layoutModule && typeof window._layoutModule.getState === 'function') {
+                    const st = window._layoutModule.getState();
+                    if (st && Array.isArray(st.symbols) && st.symbols.length > 0) return true;
+                    if (st && Array.isArray(st.cadLines) && st.cadLines.length > 0) return true;
+                    if (st && st.activePreset) return true;
+                }
+            } catch (e) { /* ignore */ }
+            return false;
+        }
+        function _isBodyDone() {
+            try {
+                if (window._bodyModule && typeof window._bodyModule.getState === 'function') {
+                    const st = window._bodyModule.getState();
+                    // デフォルト state からの差分を簡易判定: customLayoutData / 任意のテキスト印字 / SVG が有効
+                    if (st && (st.customLayoutData || st.enableTopText || st.enableBottomText || st.enableTopSide || st.enableBottomSide || st.enableSvg)) return true;
+                    // mountType, layout が変更されていれば done 扱い (デフォルト '60' / 'tray' でないなら)
+                    if (st && (st.layout !== '60' || st.mountType !== 'tray')) return true;
+                }
+            } catch (e) { /* ignore */ }
+            return false;
+        }
+        function _isKeycapDone() {
+            try {
+                // 文字 / SVG / インポートモデル / ストラップ穴のいずれかが有効でデフォルトから外れている
+                if (state.text && state.text !== 'A') return true;
+                if (state.text2 && state.enableText2) return true;
+                if (state.enableSide) return true;
+                if (state.enableSvg && state.svgContent) return true;
+                if (state.strapHoleEnabled) return true;
+                if (state.imgContent && state.imgTextureVisible) return true;
+            } catch (e) { /* ignore */ }
+            return false;
+        }
+        function _isExportDone() {
+            try {
+                return localStorage.getItem('kbs_last_export_at') ? true : false;
+            } catch (e) { return false; }
+        }
+        function _refreshWorkflowGuide() {
+            const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
+            const stepsState = {
+                layout: _isLayoutDone() ? 'done' : 'todo',
+                body:   _isBodyDone()   ? 'done' : 'todo',
+                keycap: _isKeycapDone() ? 'done' : 'todo',
+                export: _isExportDone() ? 'done' : 'todo'
+            };
+            // 現在モジュール = active (done より優先)
+            if (stepsState[cur] !== undefined) stepsState[cur] = 'active';
+
+            document.querySelectorAll('#workflow-guide .wf-step').forEach(btn => {
+                const step = btn.dataset.step;
+                btn.classList.remove('wf-active', 'wf-done', 'wf-todo');
+                btn.classList.add('wf-' + (stepsState[step] || 'todo'));
+            });
+        }
+        document.querySelectorAll('#workflow-guide .wf-step').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mod = btn.dataset.module;
+                const action = btn.dataset.action;
+                if (mod) {
+                    const sel = document.getElementById('module-select');
+                    if (sel) {
+                        sel.value = mod;
+                        sel.dispatchEvent(new Event('change'));
+                    } else {
+                        try { switchModule(mod); } catch (e) { /* ignore */ }
+                        _refreshWorkflowGuide();
+                    }
+                } else if (action === 'export') {
+                    // 出力ステップ: 現在のモジュールに応じた export ボタンをクリック
+                    let exportBtn = null;
+                    if (currentModule === 'body' && window._bodyModule && typeof window._bodyModule.showBodyExportDialog === 'function') {
+                        window._bodyModule.showBodyExportDialog();
+                    } else if (currentModule === 'layout' && window._layoutModule && typeof window._layoutModule.openExportDialog === 'function') {
+                        window._layoutModule.openExportDialog();
+                    } else {
+                        exportBtn = document.getElementById('btn-export-single');
+                        if (exportBtn) exportBtn.click();
+                    }
+                    try { localStorage.setItem('kbs_last_export_at', String(Date.now())); } catch (e) { /* ignore */ }
+                    _refreshWorkflowGuide();
+                }
+            });
+        });
+        // 状態変化 (updateModel 後など) でワークフローガイドを更新するため hook
+        if (typeof window !== 'undefined') window._refreshWorkflowGuide = _refreshWorkflowGuide;
+        // 初期表示
+        setTimeout(_refreshWorkflowGuide, 100);
 
         init();
     </script>

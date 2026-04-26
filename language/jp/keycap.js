@@ -53,6 +53,12 @@ export const keycapJa = {
     // SVG Settings
     h_svg: "SVGアイコン設定", btn_upload_svg: "SVG読込", btn_svg_manager: "SVGマネージャーを開く", cat_custom: "カスタム", lbl_visible: "表示",
 
+    // 制作フロー誘導 (Phase 6-1)
+    wf_step_layout: "レイアウト",
+    wf_step_body: "ボディ",
+    wf_step_keycap: "キーキャップ",
+    wf_step_export: "出力",
+
     // 断面ビュー
     h_cross_section: "断面ビュー",
     lbl_enable_cross_section: "断面を表示",

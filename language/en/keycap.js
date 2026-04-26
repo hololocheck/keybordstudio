@@ -52,6 +52,12 @@ export const keycapEn = {
     // SVG Settings
     h_svg: "SVG Icon Settings", btn_upload_svg: "Load SVG", btn_svg_manager: "Open SVG Manager", cat_custom: "Custom", lbl_visible: "Visible",
 
+    // Workflow guide (Phase 6-1)
+    wf_step_layout: "Layout",
+    wf_step_body: "Body",
+    wf_step_keycap: "Keycap",
+    wf_step_export: "Export",
+
     // Cross-section view
     h_cross_section: "Cross-Section View",
     lbl_enable_cross_section: "Show cross-section",
