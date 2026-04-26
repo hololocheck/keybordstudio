@@ -12386,6 +12386,42 @@ result
         function resetParams() { if (confirm("Reset all parameters?")) { state = JSON.parse(JSON.stringify(initialState)); syncUI(); updateModel(); } }
 
         let committedFont = state.font;
+        // OTF/TTF の lazy グリフを idle 時間に事前評価しておく。
+        // ユーザーが文字を打ったタイミングで初回 executeCharString / parseGlyph が走ると
+        // 50–200ms のヒッチが起きるが、それを使う前に解消しておくと体感「最初から軽い」になる。
+        // Latin + Kana の使用頻度が高い文字を中心にウォームアップ（漢字 2000 字を全部やると
+        // それ自体がフリーズになるので入れない）。
+        const _FONT_WARM_CHARS =
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' +
+            '0123456789!@#$%^&*()-_=+[]{}|;:\'\",.<>/? ' +
+            'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽぁぃぅぇぉっゃゅょー' +
+            'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポァィゥェォッャュョーヴ';
+        const _warmedFontKeys = new Set();
+        function _warmFontGlyphs(fontName) {
+            if (!fontName || _warmedFontKeys.has(fontName)) return;
+            const data = (typeof loadedFontData !== 'undefined') ? loadedFontData[fontName] : null;
+            if (!data || !data.glyphs || !data._meta) return; // FontEngine3D 経由の typeface のみ対象
+            _warmedFontKeys.add(fontName);
+            let i = 0;
+            const total = _FONT_WARM_CHARS.length;
+            const tick = () => {
+                const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                while (i < total) {
+                    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                    if (now - start > 6) break; // 1 tick あたり 6ms 以上は使わない
+                    const g = data.glyphs[_FONT_WARM_CHARS[i++]];
+                    if (g) { try { void g.o; } catch (e) { /* ignore */ } }
+                }
+                if (i < total) {
+                    if (typeof requestIdleCallback === 'function') requestIdleCallback(tick);
+                    else setTimeout(tick, 1);
+                }
+            };
+            if (typeof requestIdleCallback === 'function') requestIdleCallback(tick);
+            else setTimeout(tick, 50);
+        }
+        if (typeof window !== 'undefined') window._warmFontGlyphs = _warmFontGlyphs;
+
         let customDropdownInitialized = false;
         function setupCustomDropdown() {
             const head = document.getElementById('custom-font-head'); const list = document.getElementById('custom-font-list'); const hiddenSelect = document.getElementById('font-family');
@@ -12395,6 +12431,8 @@ result
                 let _hoverPreviewTimer = null;
                 list.innerHTML = ''; Array.from(hiddenSelect.options).forEach(opt => {
                     if (!loadedFontData[opt.value]) return;
+                    // フォント候補が見えた時点で idle ウォーミング（lazy グリフを事前展開）
+                    _warmFontGlyphs(opt.value);
                     const div = document.createElement('div'); div.className = 'custom-option'; div.textContent = opt.text; if (opt.value === state[fk]) div.classList.add('selected');
                     div.addEventListener('mouseenter', () => {
                         if (_hoverPreviewTimer) clearTimeout(_hoverPreviewTimer);
@@ -12412,6 +12450,8 @@ result
                         committedFont = opt.value;
                         state[fk2] = committedFont;
                         hiddenSelect.value = committedFont;
+                        // 確定したフォントは確実にウォーム（dropdown を素早く閉じた場合に備えて）
+                        _warmFontGlyphs(committedFont);
                         list.classList.remove('open');
                         updateCustomDropdownHead();
                         // 簡単モードのフォントセレクターも同期（メイン文字の場合のみ）
@@ -17998,7 +18038,15 @@ ${componentsXml}      </components>
             return newShape;
         }
 
-        function updateModel() {
+        // updateModel(opts):
+        //   opts.light=true … 入力中の軽量プレビュー。重い CSG (engrave subtract / imported subtract) を
+        //                      スキップし、engrave テキストは半透明オーバーレイで暫定表示する。
+        //   opts.light=false … フル品質。本来のジオメトリを CSG で生成。
+        // ユーザーは入力直後に light で即座にフィードバックを得て、操作を止めると 220ms 後に
+        // heavy 版へ自動的に置換される（詳細は requestUpdate 参照）。
+        function updateModel(opts) {
+            opts = opts || {};
+            const light = !!opts.light;
             mainGroup.rotation.x = THREE.MathUtils.degToRad(state.globalRotX);
             mainGroup.rotation.y = THREE.MathUtils.degToRad(state.globalRotY);
             const p = getParams();
@@ -18069,13 +18117,22 @@ ${componentsXml}      </components>
                 importedGeo.translate(state.modelX, state.modelY, state.modelZ);
             }
 
-            if (state.modelOperation === 'subtract' && importedGeo && finalKeycapGeo) {
+            if (state.modelOperation === 'subtract' && importedGeo && finalKeycapGeo && !light) {
                 finalKeycapGeo = _csgCachedSubtract(finalKeycapGeo, importedGeo);
                 importedGeo = null;
             }
 
+            // Engrave 用 CSG はパイプラインで最も重い箇所。light モードでは実行せず、
+            // 暫定的に半透明オーバーレイで「文字位置と大きさ」だけ示す。
+            // 操作停止後の heavy update で正式な凹み形状に置き換わる。
+            let _lightEngravePreview = null;
             if (finalEngraveGeo && finalKeycapGeo) {
-                finalKeycapGeo = _csgCachedSubtract(finalKeycapGeo, finalEngraveGeo);
+                if (light) {
+                    _lightEngravePreview = finalEngraveGeo;
+                    finalEngraveGeo = null;
+                } else {
+                    finalKeycapGeo = _csgCachedSubtract(finalKeycapGeo, finalEngraveGeo);
+                }
             }
 
             if (finalKeycapGeo) {
@@ -18096,6 +18153,20 @@ ${componentsXml}      </components>
                 mesh.name = "ImportedModel";
                 mainGroup.add(mesh);
             }
+            // light モード時の engrave 暫定オーバーレイ（半透明）
+            if (_lightEngravePreview) {
+                const lightMat = new THREE.MeshStandardMaterial({
+                    color: state.colText,
+                    roughness: 0.6,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.55
+                });
+                const lightMesh = new THREE.Mesh(_lightEngravePreview, lightMat);
+                lightMesh.name = "KeycapEngrave-preview";
+                mainGroup.add(lightMesh);
+            }
 
             // V67: ガムボール再アタッチ（ドラッグ中はスキップ）
             const gumballBtn = document.getElementById('hud-gumball-toggle');
@@ -18106,26 +18177,36 @@ ${componentsXml}      </components>
             calculateStats();
         }
 
-        // 引数なしの requestUpdate は requestAnimationFrame で1フレーム単位に集約する。
-        // - 連続入力（キー連打／スライダードラッグ）はフレーム毎に最大1回 updateModel
-        // - 体感はほぼリアルタイム（最大~16ms 遅延）。同形は CSG / Extrude キャッシュで即時返却される
-        // - IME 入力中は呼出側 (compositionstart/end ハンドラ) でガードする
-        // 引数で delay を渡したケース（旧来の長デバウンス）は setTimeout 経路を維持。
+        // 引数なしの requestUpdate は二段レンダリング:
+        //   - 即時 (rAF): light=true で軽量プレビュー → 連続入力でも 1 フレーム以内に反映
+        //   - 遅延 (220ms): light=false でフル品質 → 操作が止まった後に CSG 込みで仕上げる
+        // OTF/engrave のような重い処理は light でスキップされるので入力中も止まらない。
+        // CSG / Extrude キャッシュにヒットすれば light/heavy どちらも瞬時で返る。
+        // 引数で delay を渡した呼び出しは旧来の長デバウンス経路（互換性のため残す）。
         let debounceTimeout = null;
         let _updateRAF = null;
+        let _heavyUpdateTimer = null;
+        const _HEAVY_UPDATE_DELAY = 220;
         function requestUpdate(delay) {
             if (typeof delay === 'number' && delay > 0) {
                 if (_updateRAF) { cancelAnimationFrame(_updateRAF); _updateRAF = null; }
+                if (_heavyUpdateTimer) { clearTimeout(_heavyUpdateTimer); _heavyUpdateTimer = null; }
                 if (debounceTimeout) clearTimeout(debounceTimeout);
                 debounceTimeout = setTimeout(() => { debounceTimeout = null; updateModel(); }, delay);
                 return;
             }
             if (debounceTimeout) { clearTimeout(debounceTimeout); debounceTimeout = null; }
-            if (_updateRAF) return;
-            _updateRAF = requestAnimationFrame(() => {
-                _updateRAF = null;
-                updateModel();
-            });
+            if (!_updateRAF) {
+                _updateRAF = requestAnimationFrame(() => {
+                    _updateRAF = null;
+                    updateModel({ light: true });
+                });
+            }
+            if (_heavyUpdateTimer) clearTimeout(_heavyUpdateTimer);
+            _heavyUpdateTimer = setTimeout(() => {
+                _heavyUpdateTimer = null;
+                updateModel({ light: false });
+            }, _HEAVY_UPDATE_DELAY);
         }
 
         function cleanupGeometry(geometry) {
