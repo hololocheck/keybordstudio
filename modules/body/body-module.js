@@ -2712,6 +2712,7 @@ function bindUI() {
         'body-bottom-side-text': 'bottomSideText',
     };
     // IME 入力中はテキスト確定までパイプラインを動かさない（漢字変換時のカクツキ対策）。
+    // それ以外は requestBodyUpdate (rAF 集約) でほぼ瞬時に反映。
     Object.entries(textInputMap).forEach(([id, prop]) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -2720,12 +2721,12 @@ function bindUI() {
         el.addEventListener('compositionend', () => {
             _bodyComposing = false;
             state[prop] = el.value;
-            requestBodyUpdateDebounced(300);
+            requestBodyUpdate();
         });
         el.addEventListener('input', () => {
             if (_bodyComposing) return;
             state[prop] = el.value;
-            requestBodyUpdateDebounced(300);
+            requestBodyUpdate();
         });
         el.addEventListener('change', () => bodyCommitHistory());
     });

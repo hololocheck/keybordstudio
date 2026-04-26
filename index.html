@@ -18106,11 +18106,26 @@ ${componentsXml}      </components>
             calculateStats();
         }
 
+        // 引数なしの requestUpdate は requestAnimationFrame で1フレーム単位に集約する。
+        // - 連続入力（キー連打／スライダードラッグ）はフレーム毎に最大1回 updateModel
+        // - 体感はほぼリアルタイム（最大~16ms 遅延）。同形は CSG / Extrude キャッシュで即時返却される
+        // - IME 入力中は呼出側 (compositionstart/end ハンドラ) でガードする
+        // 引数で delay を渡したケース（旧来の長デバウンス）は setTimeout 経路を維持。
         let debounceTimeout = null;
+        let _updateRAF = null;
         function requestUpdate(delay) {
-            if (typeof delay !== 'number') delay = 100;
-            if (debounceTimeout) clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(updateModel, delay);
+            if (typeof delay === 'number' && delay > 0) {
+                if (_updateRAF) { cancelAnimationFrame(_updateRAF); _updateRAF = null; }
+                if (debounceTimeout) clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => { debounceTimeout = null; updateModel(); }, delay);
+                return;
+            }
+            if (debounceTimeout) { clearTimeout(debounceTimeout); debounceTimeout = null; }
+            if (_updateRAF) return;
+            _updateRAF = requestAnimationFrame(() => {
+                _updateRAF = null;
+                updateModel();
+            });
         }
 
         function cleanupGeometry(geometry) {
@@ -22294,6 +22309,7 @@ ${mesh.triangles.join('\n')}
         // IME (日本語/中国語/韓国語) 入力中はテキストが確定しないので update を発火しない。
         // 「漢字」と打つと変換候補表示の度に input が走り、毎回 ExtrudeGeometry + CSG が
         // キックされていた。compositionend で確定した瞬間にだけパイプラインを動かす。
+        // 確定後と通常入力時はどちらも引数なし requestUpdate で rAF 集約 → 1フレーム以内に反映。
         function _bindTextInputWithIME(el, applyValue) {
             if (!el) return;
             let composing = false;
@@ -22301,12 +22317,12 @@ ${mesh.triangles.join('\n')}
             el.addEventListener('compositionend', () => {
                 composing = false;
                 applyValue(el.value);
-                requestUpdate(300);
+                requestUpdate();
             });
             el.addEventListener('input', e => {
                 if (composing) return;
                 applyValue(e.target.value);
-                requestUpdate(300);
+                requestUpdate();
             });
         }
         _bindTextInputWithIME(document.getElementById('text-content'),  v => { state.text = v; });
