@@ -52,6 +52,21 @@ export const keycapEn = {
     // SVG Settings
     h_svg: "SVG Icon Settings", btn_upload_svg: "Load SVG", btn_svg_manager: "Open SVG Manager", cat_custom: "Custom", lbl_visible: "Visible",
 
+    // Cross-section view
+    h_cross_section: "Cross-Section View",
+    lbl_enable_cross_section: "Show cross-section",
+    lbl_cross_section_axis: "Axis",
+    lbl_cross_section_pos: "Position",
+    opt_axis_x: "X axis (horizontal)",
+    opt_axis_y: "Y axis (height)",
+    opt_axis_z: "Z axis (depth)",
+    cross_section_note: "* Display only — does not affect STL/3MF export.",
+
+    // Pre-flight check
+    h_preflight: "Pre-flight Checklist",
+    btn_preflight: "Pre-flight check",
+    btn_close: "Close",
+
     // Strap Hole
     h_strap_hole: "Strap Hole", lbl_enable_strap_hole: "Cut strap hole",
     lbl_strap_hole_diameter: "Diameter", lbl_strap_hole_shape: "Shape",

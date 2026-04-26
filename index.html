@@ -8990,6 +8990,22 @@
                         </div>
                     </div>
 
+                    <h3 id="sec-cross-section" data-i18n="h_cross_section">断面ビュー</h3>
+                    <div class="control-group" data-hint="hint_cross_section">
+                        <label class="toggle-switch"><input type="checkbox" id="cross-section-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_enable_cross_section">断面を表示</span></label>
+                        <div class="control-row" style="margin-top:6px;">
+                            <div style="flex:1"><label><span data-i18n="lbl_cross_section_axis">軸</span></label>
+                                <select id="cross-section-axis" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
+                                    <option value="x" data-i18n="opt_axis_x">X 軸 (横)</option>
+                                    <option value="y" selected data-i18n="opt_axis_y">Y 軸 (高さ)</option>
+                                    <option value="z" data-i18n="opt_axis_z">Z 軸 (奥行き)</option>
+                                </select>
+                            </div>
+                            <div style="flex:1"><label><span data-i18n="lbl_cross_section_pos">位置</span> <span id="v-cross-section-pos" class="val" data-target="cross-section-pos">0.0</span> mm</label><input type="range" id="cross-section-pos" min="-15" max="15" step="0.1" value="0"></div>
+                        </div>
+                        <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="cross_section_note">※ 表示専用機能です。STL/3MF 出力には影響しません。</p>
+                    </div>
+
                     <h3 id="sec-color" data-i18n="h_colors">色設定</h3>
 
                     <!-- V67: AMS連携カラーパレット (ドロップダウン統合) -->
@@ -9120,9 +9136,9 @@
                         </div>
                     </div>
                     <div class="v60-sub-panel" style="border-color:#00e5ff; margin-bottom:10px;">
-                        <label style="color:#00e5ff; font-weight:bold;" data-i18n="lbl_env_backup">環境バックアップ</label>
+                        <label style="color:#00e5ff; font-weight:bold;" data-i18n="lbl_env_backup">プロジェクトファイル (.kbsproj)</label>
                         <p style="font-size:0.65rem; color:#888; margin:4px 0 8px;" data-i18n="lbl_env_backup_desc">
-                            全設定・ギャラリー・フォント・SVG・AMS設定を1ファイルに保存</p>
+                            キーキャップ・ボディ・レイアウトの全設定とギャラリー、フォント、SVG、AMSを1ファイルにまとめて保存</p>
                         <label class="toggle-switch" style="margin-bottom:8px;">
                             <input type="checkbox" id="backup-include-fonts" class="toggle-input" checked>
                             <span class="toggle-knob" style="width:28px; height:14px;"></span>
@@ -9132,12 +9148,12 @@
                         <div class="control-row">
                             <button id="btn-env-export" class="secondary btn-small"
                                 style="flex:1; border-color:#00e5ff; color:#00e5ff;"
-                                data-i18n="btn_env_export">バックアップ書き出し</button>
+                                data-i18n="btn_env_export">プロジェクト保存</button>
                             <div class="file-upload" style="flex:1;">
                                 <label for="env-import-input" class="file-upload-label preset btn-small"
                                     style="border-color:#00e5ff; color:#00e5ff;"
-                                    data-i18n="btn_env_import">バックアップ読み込み</label>
-                                <input type="file" id="env-import-input" accept=".json">
+                                    data-i18n="btn_env_import">プロジェクト読込</label>
+                                <input type="file" id="env-import-input" accept=".kbsproj,.json">
                             </div>
                         </div>
                     </div>
@@ -9189,6 +9205,9 @@
                     <div class="control-group" style="margin-bottom:10px;"><label data-i18n="lbl_filename">ファイル名設定
                             (自動で[文字]が付与されます)</label><input type="text" id="export-name" value="keycap"
                             style="text-align:left;"></div>
+                    <button id="btn-preflight-check" class="secondary btn-small"
+                        style="margin-bottom:8px; width:100%; border-color:#ffb74d; color:#ffb74d; font-weight:bold;"
+                        data-i18n="btn_preflight">製造前チェック</button>
                     <button id="btn-export-single" class="primary"
                         style="background:linear-gradient(135deg, #4fc3f7, #4caf50); border:none; color:#000; font-weight:bold;"
                         data-i18n="btn_export_single" data-hint="hint_export">エクスポート</button>
@@ -12232,7 +12251,11 @@ result
             strapHoleDiameter: 3.0,
             strapHoleX: 0, strapHoleZ: 0, // 面ローカルの U / V (top: X/Z, side: 横/高さ)
             strapHoleLength: 5.0,     // slot 形状時の長さ
-            strapHoleAngle: 0         // slot 形状時の貫通軸まわり回転 (度)
+            strapHoleAngle: 0,        // slot 形状時の貫通軸まわり回転 (度)
+            // 断面ビュー: 内部構造（肉厚・ステム・カーブ）を確認するためのクリッピング表示
+            crossSectionEnabled: false,
+            crossSectionAxis: 'y',    // 'x' | 'y' | 'z'
+            crossSectionPos: 0
         };
         let state = JSON.parse(JSON.stringify(initialState));
         let importedModelBuffer = null;
@@ -12366,6 +12389,7 @@ result
             'svg-offset-y': 'svgOffsetY', 'svg-pos-x': 'svgPosX', 'svg-pos-z': 'svgPosZ',
             'strap-hole-diameter': 'strapHoleDiameter', 'strap-hole-x': 'strapHoleX', 'strap-hole-z': 'strapHoleZ',
             'strap-hole-length': 'strapHoleLength', 'strap-hole-angle': 'strapHoleAngle',
+            'cross-section-pos': 'crossSectionPos',
             'text2-size': 'text2Size', 'text2-x': 'text2X', 'text2-z': 'text2Z',
             'side-size': 'sideSize', 'side-y': 'sideY', 'side-rot': 'sideRot',
             'side-text': 'sideText',
@@ -12389,7 +12413,8 @@ result
             'enable-text2': 'enableText2', 'enable-side': 'enableSide', 'model-visible': 'modelVisible',
             'enable-stem-extension': 'enableStemExtension', 'box-stem': 'boxStem', 'lego-stud': 'legoStud',
             'img-texture-visible': 'imgTextureVisible', 'texture-global': 'textureGlobal',
-            'strap-hole-enabled': 'strapHoleEnabled'
+            'strap-hole-enabled': 'strapHoleEnabled',
+            'cross-section-enabled': 'crossSectionEnabled'
         };
 
         function commitHistory() { if (historyIndex < history.length - 1) history.splice(historyIndex + 1); history.push(JSON.parse(JSON.stringify(state))); historyIndex++; if (history.length > 50) { history.shift(); historyIndex--; } updateHistoryBtns(); }
@@ -12621,7 +12646,33 @@ result
         const HTML_COLORS = ['#000000', '#333333', '#666666', '#ffffff', '#ff0000', '#ff8000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#8000ff', '#ff00ff', '#800000', '#008000', '#000080', '#808000'];
         const container = document.getElementById('canvas-container'); const scene = new THREE.Scene(); scene.background = new THREE.Color(0x121212);
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000); camera.position.set(20, 30, 30);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(container.clientWidth, container.clientHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.autoClear = false; container.appendChild(renderer.domElement);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(container.clientWidth, container.clientHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.autoClear = false; renderer.localClippingEnabled = true; container.appendChild(renderer.domElement);
+
+        // 断面ビュー用のクリッピング平面 (state.crossSection* から動的更新)
+        const _crossSectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1000);
+        function _updateCrossSectionPlane() {
+            if (!state.crossSectionEnabled) {
+                _crossSectionPlane.normal.set(0, -1, 0);
+                _crossSectionPlane.constant = 1000; // 影響を消す（事実上カット無効）
+                return;
+            }
+            const pos = state.crossSectionPos || 0;
+            switch (state.crossSectionAxis) {
+                case 'x':
+                    _crossSectionPlane.normal.set(-1, 0, 0);
+                    _crossSectionPlane.constant = pos;
+                    break;
+                case 'z':
+                    _crossSectionPlane.normal.set(0, 0, -1);
+                    _crossSectionPlane.constant = pos;
+                    break;
+                case 'y':
+                default:
+                    _crossSectionPlane.normal.set(0, -1, 0);
+                    _crossSectionPlane.constant = pos;
+                    break;
+            }
+        }
         const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
 
         // V67: ビューキューブ初期化（ViewHelperを置き換え）
@@ -18174,9 +18225,12 @@ ${componentsXml}      </components>
             const p = getParams();
             let bodyMat, textMat;
 
+            // 断面ビューが有効ならクリッピング平面を更新し、material 共有で適用
+            _updateCrossSectionPlane();
+            const _clipPlanes = state.crossSectionEnabled ? [_crossSectionPlane] : null;
             if (state.renderMode === 'wireframe') {
-                bodyMat = new THREE.MeshBasicMaterial({ color: state.colBody, wireframe: true });
-                textMat = new THREE.MeshBasicMaterial({ color: state.colText, wireframe: true });
+                bodyMat = new THREE.MeshBasicMaterial({ color: state.colBody, wireframe: true, clippingPlanes: _clipPlanes });
+                textMat = new THREE.MeshBasicMaterial({ color: state.colText, wireframe: true, clippingPlanes: _clipPlanes });
             } else {
                 let map = null;
                 if (state.imgContent && state.imgTextureVisible) {
@@ -18185,8 +18239,8 @@ ${componentsXml}      </components>
                     map.wrapT = THREE.ClampToEdgeWrapping;
                     map.minFilter = THREE.LinearFilter;
                 }
-                bodyMat = new THREE.MeshStandardMaterial({ color: state.colBody, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide, map: map });
-                textMat = new THREE.MeshStandardMaterial({ color: state.colText, side: THREE.DoubleSide });
+                bodyMat = new THREE.MeshStandardMaterial({ color: state.colBody, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide, map: map, clippingPlanes: _clipPlanes });
+                textMat = new THREE.MeshStandardMaterial({ color: state.colText, side: THREE.DoubleSide, clippingPlanes: _clipPlanes });
             }
 
             // ボディを作成
@@ -22418,6 +22472,11 @@ ${mesh.triangles.join('\n')}
             });
             // 言語切替時にもラベルを再計算したいので外部から呼べるよう公開
             if (typeof window !== 'undefined') window._updateStrapHoleLabels = _updateStrapHoleLabels;
+            // 断面ビュー: 軸選択
+            document.getElementById('cross-section-axis')?.addEventListener('change', (e) => {
+                state.crossSectionAxis = e.target.value;
+                requestUpdate();
+            });
             // render-mode select removed - wireframe toggle handled by HUD button
             document.getElementById('stabilizer-type').addEventListener('change', (e) => {
                 state.stabilizerType = e.target.value;
@@ -25391,22 +25450,32 @@ ${mesh.triangles.join('\n')}
 
         document.getElementById('btn-env-export').addEventListener('click', async () => {
             try {
-                showToast(currentLang === 'ja' ? 'バックアップ作成中...' : 'Creating backup...');
+                showToast(currentLang === 'ja' ? 'プロジェクト保存中...' : 'Saving project...');
                 const includeFonts = document.getElementById('backup-include-fonts').checked;
 
-                // Collect all data
+                // Collect all data — Phase 4-1: Body / Layout の state + ギャラリーも統合
                 const gallery = await readAllFromIDB('KeycapGalleryDB_V67', 'presets');
                 const svgs = await readAllFromIDB('kcg_svgdb', 'svgs');
                 const fonts = includeFonts ? await readAllFromIDB('kcg_fontdb', 'fonts') : [];
+                let bodyGallery = [], layoutGallery = [];
+                try { bodyGallery = await readAllFromIDB('BodyGalleryDB_V1', 'presets'); } catch (e) { /* ignore */ }
+                try { layoutGallery = await readAllFromIDB('LayoutGalleryDB_V1', 'presets'); } catch (e) { /* ignore */ }
+                const bodyState = (window._bodyModule && typeof window._bodyModule.getState === 'function') ? window._bodyModule.getState() : null;
+                const layoutState = (window._layoutModule && typeof window._layoutModule.getState === 'function') ? window._layoutModule.getState() : null;
 
                 const backup = {
-                    _backupType: 'kcg_environment',
-                    _backupVersion: 2,
+                    _backupType: 'kbsproj',         // Phase 4-1: プロジェクトファイル v3
+                    _backupVersion: 3,
+                    _legacyType: 'kcg_environment', // 旧バージョンのインポート互換
                     _createdAt: new Date().toISOString(),
                     _includedFonts: includeFonts,
                     state: JSON.parse(JSON.stringify(state)),
+                    bodyState: bodyState ? JSON.parse(JSON.stringify(bodyState)) : null,
+                    layoutState: layoutState ? JSON.parse(JSON.stringify(layoutState)) : null,
                     amsConfig: localStorage.getItem('keycapAMSConfig') || null,
                     gallery: gallery,
+                    bodyGallery: bodyGallery,
+                    layoutGallery: layoutGallery,
                     customFonts: fonts,
                     customSVGs: svgs
                 };
@@ -25415,11 +25484,11 @@ ${mesh.triangles.join('\n')}
                 const sizeMB = (jsonStr.length / 1024 / 1024).toFixed(1);
                 const blob = new Blob([jsonStr], { type: 'application/json' });
                 const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-                saveBlob(blob, `KCG_Backup_${dateStr}.json`);
-                showToast(currentLang === 'ja' ? `バックアップ完了（${sizeMB}MB）` : `Backup complete (${sizeMB}MB)`);
+                saveBlob(blob, `KeybordStudio_${dateStr}.kbsproj`);
+                showToast(currentLang === 'ja' ? `プロジェクト保存完了（${sizeMB}MB）` : `Project saved (${sizeMB}MB)`);
             } catch (e) {
-                console.error('Backup export error:', e);
-                showToast(currentLang === 'ja' ? 'バックアップに失敗しました' : 'Backup failed', true);
+                console.error('Project export error:', e);
+                showToast(currentLang === 'ja' ? 'プロジェクト保存に失敗しました' : 'Save failed', true);
             }
         });
 
@@ -25431,24 +25500,28 @@ ${mesh.triangles.join('\n')}
                 const text = await file.text();
                 const json = JSON.parse(text);
 
-                if (json._backupType === 'kcg_environment') {
-                    // Full environment backup
+                if (json._backupType === 'kcg_environment' || json._backupType === 'kbsproj') {
+                    // Full project backup (.kbsproj v3 / legacy v2)
                     const parts = [];
-                    if (json.state) parts.push(currentLang === 'ja' ? '設定' : 'Settings');
+                    if (json.state) parts.push(currentLang === 'ja' ? 'キーキャップ設定' : 'Keycap');
+                    if (json.bodyState) parts.push(currentLang === 'ja' ? 'ボディ設定' : 'Body');
+                    if (json.layoutState) parts.push(currentLang === 'ja' ? 'レイアウト設定' : 'Layout');
                     if (json.gallery?.length) parts.push(currentLang === 'ja' ? `ギャラリー(${json.gallery.length})件` : `Gallery(${json.gallery.length})`);
+                    if (json.bodyGallery?.length) parts.push(currentLang === 'ja' ? `Body G.(${json.bodyGallery.length})件` : `Body G.(${json.bodyGallery.length})`);
+                    if (json.layoutGallery?.length) parts.push(currentLang === 'ja' ? `Layout G.(${json.layoutGallery.length})件` : `Layout G.(${json.layoutGallery.length})`);
                     if (json.customFonts?.length) parts.push(currentLang === 'ja' ? `フォント(${json.customFonts.length})件` : `Fonts(${json.customFonts.length})`);
                     if (json.customSVGs?.length) parts.push(currentLang === 'ja' ? `SVG(${json.customSVGs.length})件` : `SVGs(${json.customSVGs.length})`);
                     if (json.amsConfig) parts.push('AMS');
 
                     const msg = currentLang === 'ja'
-                        ? `環境を復元します。\n含まれるデータ: ${parts.join(', ')}\n\n※ 現在のデータは上書きされます。\n実行しますか？`
-                        : `Restore environment?\nIncludes: ${parts.join(', ')}\n\nExisting data will be overwritten.\nProceed?`;
+                        ? `プロジェクトを復元します。\n含まれるデータ: ${parts.join(', ')}\n\n※ 現在のデータは上書きされます。\n実行しますか？`
+                        : `Restore project?\nIncludes: ${parts.join(', ')}\n\nExisting data will be overwritten.\nProceed?`;
 
                     if (!confirm(msg)) { e.target.value = ''; return; }
 
                     showToast(currentLang === 'ja' ? '復元中...' : 'Restoring...');
 
-                    // Restore state
+                    // Restore Keycap state
                     if (json.state) {
                         Object.assign(state, json.state);
                         syncUI();
@@ -25457,15 +25530,31 @@ ${mesh.triangles.join('\n')}
                         commitHistory();
                     }
 
+                    // Restore Body state
+                    if (json.bodyState && window._bodyModule && typeof window._bodyModule.setState === 'function') {
+                        try { window._bodyModule.setState(json.bodyState); } catch (err) { console.warn('Body restore failed:', err); }
+                    }
+
+                    // Restore Layout state
+                    if (json.layoutState && window._layoutModule && typeof window._layoutModule.setState === 'function') {
+                        try { window._layoutModule.setState(json.layoutState); } catch (err) { console.warn('Layout restore failed:', err); }
+                    }
+
                     // Restore AMS
                     if (json.amsConfig) {
                         localStorage.setItem('keycapAMSConfig', typeof json.amsConfig === 'string' ? json.amsConfig : JSON.stringify(json.amsConfig));
                     }
 
-                    // Restore Gallery
+                    // Restore Galleries
                     if (json.gallery?.length > 0) {
                         await writeAllToIDB('KeycapGalleryDB_V67', 'presets', json.gallery);
                         if (typeof loadGallery === 'function') loadGallery();
+                    }
+                    if (json.bodyGallery?.length > 0) {
+                        try { await writeAllToIDB('BodyGalleryDB_V1', 'presets', json.bodyGallery); } catch (err) { console.warn('Body gallery restore failed:', err); }
+                    }
+                    if (json.layoutGallery?.length > 0) {
+                        try { await writeAllToIDB('LayoutGalleryDB_V1', 'presets', json.layoutGallery); } catch (err) { console.warn('Layout gallery restore failed:', err); }
                     }
 
                     // Restore Fonts
@@ -25478,7 +25567,7 @@ ${mesh.triangles.join('\n')}
                         await writeAllToIDB('kcg_svgdb', 'svgs', json.customSVGs);
                     }
 
-                    showToast(currentLang === 'ja' ? `環境を復元しました（${parts.join(', ')}）` : `Environment restored (${parts.join(', ')})`);
+                    showToast(currentLang === 'ja' ? `プロジェクトを復元しました（${parts.join(', ')}）` : `Project restored (${parts.join(', ')})`);
                 } else {
                     // Legacy: single preset file
                     const presetData = json.data || json;
@@ -31762,6 +31851,152 @@ ${triangles.join('\n')}
                     closeUndoRedo();
                 }
             });
+        })();
+    </script>
+
+    <!-- Phase 4-4: 製造前チェックリスト モーダル -->
+    <div id="preflight-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; display:none; align-items:center; justify-content:center;">
+        <div style="background:#1a1a2e; padding:20px 24px; border-radius:8px; max-width:640px; width:90%; max-height:80vh; overflow:auto; border:1px solid #ffb74d; box-shadow:0 0 24px rgba(255,183,77,0.25);">
+            <h3 style="color:#ffb74d; margin:0 0 12px 0; border-bottom:1px solid #444; padding-bottom:8px;" data-i18n="h_preflight">製造前チェックリスト</h3>
+            <div id="preflight-result" style="font-size:0.88rem; line-height:1.6; color:#e0f7fa;"></div>
+            <div style="margin-top:16px; text-align:right;">
+                <button id="btn-close-preflight" class="secondary btn-small" style="border-color:#ffb74d; color:#ffb74d;" data-i18n="btn_close">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ===== 製造前チェックリスト ===========================================
+        (function () {
+            function _runPreflight() {
+                const issues = [];
+                const ok = [];
+                const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                const t = (j, e) => isJa ? j : e;
+
+                // テキスト
+                if (state.enableText) {
+                    if (!state.text || String(state.text).trim() === '') {
+                        issues.push({ level: 'warn', msg: t('メイン文字が空白です。文字を入力するか「文字」を OFF に。', 'Main text is empty. Enter text or disable Text.') });
+                    }
+                    if (state.textHeight < 0.3) {
+                        issues.push({ level: 'warn', msg: t(`文字深さ ${state.textHeight}mm が薄すぎます。0.4mm以上を推奨。`, `Text depth ${state.textHeight}mm is too thin. Recommend 0.4mm+.`) });
+                    } else {
+                        ok.push(t(`文字深さ ${state.textHeight}mm`, `Text depth ${state.textHeight}mm`));
+                    }
+                    if (state.fontSize < 3) {
+                        issues.push({ level: 'warn', msg: t(`フォントサイズ ${state.fontSize}mm が小さく、印刷で潰れる可能性があります。`, `Font size ${state.fontSize}mm may be unreadable when printed.`) });
+                    }
+                }
+
+                // 壁厚
+                if (state.wallThickness < 1.0) {
+                    issues.push({ level: 'err', msg: t(`壁厚 ${state.wallThickness}mm は薄すぎます。割れる可能性大。1.2mm以上を推奨。`, `Wall thickness ${state.wallThickness}mm is too thin. Likely to crack. Use 1.2mm+.`) });
+                } else if (state.wallThickness < 1.2) {
+                    issues.push({ level: 'warn', msg: t(`壁厚 ${state.wallThickness}mm はやや薄め。1.5mm 以上が安心。`, `Wall thickness ${state.wallThickness}mm is borderline. 1.5mm+ recommended.`) });
+                } else {
+                    ok.push(t(`壁厚 ${state.wallThickness}mm`, `Wall thickness ${state.wallThickness}mm`));
+                }
+
+                // ステムクリアランス
+                if (state.stemClearance < 0.1) {
+                    issues.push({ level: 'err', msg: t(`ステムクリアランス ${state.stemClearance}mm がきつすぎ。スイッチに刺さらない可能性。`, `Stem clearance ${state.stemClearance}mm is too tight. May not fit on switch.`) });
+                } else if (state.stemClearance > 0.5) {
+                    issues.push({ level: 'warn', msg: t(`ステムクリアランス ${state.stemClearance}mm が緩すぎ。スイッチに保持されない可能性。`, `Stem clearance ${state.stemClearance}mm is too loose. May fall off switch.`) });
+                } else {
+                    ok.push(t(`ステムクリアランス ${state.stemClearance}mm`, `Stem clearance ${state.stemClearance}mm`));
+                }
+
+                // 色被り
+                if (state.enableText && state.colBody && state.colText && state.colBody.toLowerCase() === state.colText.toLowerCase()) {
+                    issues.push({ level: 'warn', msg: t('本体色と文字色が同じです。文字が見えません。', 'Body color and text color are identical. Text will be invisible.') });
+                }
+
+                // SVG
+                if (state.enableSvg && !state.svgContent) {
+                    issues.push({ level: 'warn', msg: t('SVGが有効ですがファイルが読み込まれていません。', 'SVG is enabled but no file loaded.') });
+                }
+
+                // ストラップ穴
+                if (state.strapHoleEnabled) {
+                    if (state.strapHoleDiameter < 1.5) {
+                        issues.push({ level: 'warn', msg: t(`ストラップ穴 Φ${state.strapHoleDiameter}mm は小さすぎます (1.5mm未満は印刷で潰れがち)。`, `Strap hole Φ${state.strapHoleDiameter}mm is too small (under 1.5mm may close up).`) });
+                    } else {
+                        ok.push(t(`ストラップ穴 Φ${state.strapHoleDiameter}mm`, `Strap hole Φ${state.strapHoleDiameter}mm`));
+                    }
+                    // 文字との干渉 (top面のみ簡易チェック)
+                    if (state.enableText && state.strapHoleFace === 'top') {
+                        const dx = (state.strapHoleX || 0) - (state.posX || 0);
+                        const dz = (state.strapHoleZ || 0) - (state.posZ || 0);
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+                        if (dist < 5) {
+                            issues.push({ level: 'warn', msg: t(`ストラップ穴と文字の距離が ${dist.toFixed(1)}mm と近く、文字が削られる可能性。`, `Strap hole and text are only ${dist.toFixed(1)}mm apart, text may be cut.`) });
+                        }
+                    }
+                }
+
+                // 断面ビュー (出力に影響しないが、ON のままだと混乱しやすい)
+                if (state.crossSectionEnabled) {
+                    issues.push({ level: 'info', msg: t('断面ビューが ON です（出力には影響しませんが、表示が一部欠けて見えます）。', 'Cross-section view is ON (output is unaffected, but parts of the model appear cut).') });
+                }
+
+                // インポートモデル
+                if (state.modelVisible && !importedModelBuffer) {
+                    issues.push({ level: 'warn', msg: t('インポートモデルが「表示」ですが、モデルが読み込まれていません。', 'Imported model is set to visible, but no model is loaded.') });
+                }
+
+                // AMS / extruder 整合
+                if (state.bodyExtruder != null && state.textExtruder != null && state.bodyExtruder === state.textExtruder && state.enableText) {
+                    issues.push({ level: 'warn', msg: t('本体と文字に同じ AMS スロットが割り当てられています。色分けされません。', 'Body and text use the same AMS slot. Multi-color print will not work.') });
+                }
+
+                return { issues, ok };
+            }
+
+            function _renderPreflightResult(result) {
+                const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                const lvlColor = { err: '#ff5252', warn: '#ffb74d', info: '#4fc3f7' };
+                const lvlIcon = { err: '❌', warn: '⚠️', info: 'ℹ️' };
+                let html = '';
+                if (result.issues.length === 0) {
+                    html += `<div style="color:#69f0ae; font-weight:bold; font-size:1rem; padding:8px; background:rgba(105,240,174,0.08); border-radius:4px; margin-bottom:12px;">✅ ${isJa ? '全項目クリア — 出力 OK' : 'All checks passed — ready to export'}</div>`;
+                } else {
+                    const errCount = result.issues.filter(i => i.level === 'err').length;
+                    const warnCount = result.issues.filter(i => i.level === 'warn').length;
+                    html += `<div style="color:${errCount > 0 ? '#ff5252' : '#ffb74d'}; font-weight:bold; margin-bottom:8px;">${isJa ? `指摘 ${result.issues.length} 件` : `${result.issues.length} issues`} (❌ ${errCount} / ⚠️ ${warnCount})</div>`;
+                    html += '<ul style="list-style:none; padding:0; margin:0 0 12px 0;">';
+                    for (const i of result.issues) {
+                        html += `<li style="padding:6px 8px; margin-bottom:4px; background:rgba(255,255,255,0.04); border-left:3px solid ${lvlColor[i.level] || '#888'}; border-radius:2px;"><span style="margin-right:6px;">${lvlIcon[i.level] || '•'}</span>${i.msg}</li>`;
+                    }
+                    html += '</ul>';
+                }
+                if (result.ok.length > 0) {
+                    html += `<details style="margin-top:8px;"><summary style="cursor:pointer; color:#69f0ae; font-size:0.85rem;">✓ ${isJa ? `OK 項目 (${result.ok.length})` : `Passing checks (${result.ok.length})`}</summary>`;
+                    html += '<ul style="list-style:none; padding:6px 0 0 12px; margin:0; font-size:0.78rem; color:#aaa;">';
+                    for (const o of result.ok) html += `<li>✓ ${o}</li>`;
+                    html += '</ul></details>';
+                }
+                return html;
+            }
+
+            function showPreflight() {
+                const r = _runPreflight();
+                const modal = document.getElementById('preflight-modal');
+                const out = document.getElementById('preflight-result');
+                if (out) out.innerHTML = _renderPreflightResult(r);
+                if (modal) modal.style.display = 'flex';
+            }
+
+            document.getElementById('btn-preflight-check')?.addEventListener('click', showPreflight);
+            document.getElementById('btn-close-preflight')?.addEventListener('click', () => {
+                const modal = document.getElementById('preflight-modal');
+                if (modal) modal.style.display = 'none';
+            });
+            document.getElementById('preflight-modal')?.addEventListener('click', (e) => {
+                if (e.target.id === 'preflight-modal') {
+                    e.target.style.display = 'none';
+                }
+            });
+            if (typeof window !== 'undefined') window._showPreflight = showPreflight;
         })();
     </script>
 

@@ -53,6 +53,21 @@ export const keycapJa = {
     // SVG Settings
     h_svg: "SVGアイコン設定", btn_upload_svg: "SVG読込", btn_svg_manager: "SVGマネージャーを開く", cat_custom: "カスタム", lbl_visible: "表示",
 
+    // 断面ビュー
+    h_cross_section: "断面ビュー",
+    lbl_enable_cross_section: "断面を表示",
+    lbl_cross_section_axis: "軸",
+    lbl_cross_section_pos: "位置",
+    opt_axis_x: "X 軸 (横)",
+    opt_axis_y: "Y 軸 (高さ)",
+    opt_axis_z: "Z 軸 (奥行き)",
+    cross_section_note: "※ 表示専用機能です。STL/3MF 出力には影響しません。",
+
+    // 製造前チェック
+    h_preflight: "製造前チェックリスト",
+    btn_preflight: "製造前チェック",
+    btn_close: "閉じる",
+
     // ストラップ穴
     h_strap_hole: "ストラップ穴", lbl_enable_strap_hole: "ストラップ穴を開ける",
     lbl_strap_hole_diameter: "穴径", lbl_strap_hole_shape: "形状",

@@ -1026,6 +1026,107 @@ function drawImportPreview(canvasEl, entities) {
     }
 }
 
+// ── KLE Raw Data parser ─────────────────────────────────────────────
+// 外部 KLE 依存を避けた簡易実装。Keyboard Layout Editor の Raw Data を
+// 配列 of rows (各 row は array of string|object) に変換して、Layout Studio の
+// symbol として配置する。
+function _parseKLERaw(rawText) {
+    let text = rawText.trim();
+    // ユーザーが「行配列」だけを貼ったケース (外側の [] が抜けてる) に対応
+    let data;
+    try {
+        // 1) そのまま JSON parse を試す
+        data = JSON.parse(text);
+    } catch (e1) {
+        // 2) [] でラップしてみる
+        try {
+            data = JSON.parse('[' + text + ']');
+        } catch (e2) {
+            // 3) 行を `,` でつないで wrap
+            const rows = text.split(/\n+/).map(r => r.trim()).filter(r => r.length).join(',');
+            data = JSON.parse('[' + rows + ']');
+        }
+    }
+    if (!Array.isArray(data)) throw new Error('Top level is not an array');
+
+    let startIdx = 0;
+    if (data.length > 0 && !Array.isArray(data[0]) && typeof data[0] === 'object') {
+        // metadata object — skip
+        startIdx = 1;
+    }
+
+    const keys = [];
+    let curY = 0;
+    for (let r = startIdx; r < data.length; r++) {
+        const row = data[r];
+        if (!Array.isArray(row)) continue;
+        let curX = 0;
+        let nextW = 1, nextH = 1;
+        let xMod = 0, yMod = 0;
+        for (const item of row) {
+            if (item && typeof item === 'object' && !Array.isArray(item)) {
+                if (typeof item.w === 'number') nextW = item.w;
+                if (typeof item.h === 'number') nextH = item.h;
+                if (typeof item.x === 'number') xMod += item.x;
+                if (typeof item.y === 'number') yMod += item.y;
+            } else {
+                curX += xMod;
+                curY += yMod;
+                xMod = 0; yMod = 0;
+                const label = (typeof item === 'string') ? item.split('\n')[0] : '';
+                keys.push({ x: curX, y: curY, w: nextW, h: nextH, label });
+                curX += nextW;
+                nextW = 1;
+                nextH = 1;
+            }
+        }
+        curY += 1;
+    }
+    return keys;
+}
+
+// KLE のキー定義から Layout Studio の symbol を選ぶ。
+// 幅 (w) によって 1u / 1.25u / 2u-stab / 2.25u-stab / 6.25u-stab / 7u-stab を割当て。
+function _kleWidthToSymbolType(w) {
+    if (w >= 6.5) return 'switch-7u-stab';
+    if (w >= 6.0) return 'switch-6.25u-stab';
+    if (w >= 2.5) return 'switch-2.75u-stab';
+    if (w >= 2.1) return 'switch-2.25u-stab';
+    if (w >= 1.75) return 'switch-2u-stab'; // 1.75u-2u は近い扱い
+    if (w >= 1.2) return 'switch-1.25u';
+    return 'switch-1u';
+}
+
+function importKLERawData(rawText) {
+    const keys = _parseKLERaw(rawText);
+    if (keys.length === 0) throw new Error('No keys found in KLE data');
+    // クリア確認なしで上書き（ユーザー側で手動 confirm を出すなら呼出側で）
+    const pitch = state.gridSize || PITCH;
+    let added = 0;
+    for (const k of keys) {
+        const symType = _kleWidthToSymbolType(k.w);
+        const def = SYMBOL_DEFS[symType];
+        if (!def) continue;
+        // KLE 座標は左上基点・y 下向き正。Layout Studio はミリ単位で配置。
+        // キーの中心を世界座標 (mm) で計算
+        const cx = (k.x + k.w / 2) * pitch;
+        const cy = (k.y + k.h / 2) * pitch;
+        const id = nextSymbolId++;
+        symbols.push({
+            id,
+            type: symType,
+            x: cx * PX_PER_MM,
+            y: cy * PX_PER_MM,
+            rotation: 0,
+            layer: state.activeLayerId || 1,
+            label: k.label || ''
+        });
+        added++;
+    }
+    drawCanvas();
+    return added;
+}
+
 // ── CAD Export: DXF ──────────────────────
 function exportToDXF() {
     const lines = state.cadLines;
@@ -5519,6 +5620,16 @@ function loadUI(container) {
             <div style="color:#666; font-size:0.65rem; padding:4px 2px 0;">
                 DXF/SVGファイルを読み込み、キャンバスに配置します
             </div>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #333;">
+                <label style="color:#aaa; font-size:0.72rem; display:block; margin-bottom:4px;">KLE Raw Data</label>
+                <textarea id="layout-kle-input" placeholder='[{"a":7},["Q","W","E"]]' style="width:100%; min-height:60px; background:#0a0a1a; border:1px solid #3a3a4e; color:#e0f7fa; padding:6px; border-radius:3px; font-size:0.7rem; font-family:monospace; resize:vertical; box-sizing:border-box;"></textarea>
+                <button id="layout-kle-import-btn" style="width:100%; margin-top:6px; background:#1a1a2e; border:1px solid #ffb74d; color:#ffb74d; padding:7px 12px; border-radius:4px; cursor:pointer; font-size:0.78rem; transition:background 0.2s;">
+                    KLE インポート
+                </button>
+                <div style="color:#666; font-size:0.62rem; padding:4px 2px 0; line-height:1.3;">
+                    Keyboard Layout Editor の Raw Data をペーストして読み込みます
+                </div>
+            </div>
         </div>
 
         <!-- EXPORT -->
@@ -5604,6 +5715,25 @@ function bindUI() {
     // CAD Export
     const exportBtnSidebar = document.getElementById('layout-cad-export-btn');
     if (exportBtnSidebar) exportBtnSidebar.addEventListener('click', openCadExportDialog);
+
+    // Phase 4-5: KLE Raw Data インポート
+    const kleBtn = document.getElementById('layout-kle-import-btn');
+    if (kleBtn) kleBtn.addEventListener('click', () => {
+        const ta = document.getElementById('layout-kle-input');
+        if (!ta) return;
+        const text = ta.value.trim();
+        if (!text) {
+            if (showToast) showToast('KLE Raw Data が空です。');
+            return;
+        }
+        try {
+            const added = importKLERawData(text);
+            if (showToast) showToast(`KLE インポート完了: ${added} キー`);
+        } catch (err) {
+            console.error('KLE import error:', err);
+            if (showToast) showToast('KLE 読み込み失敗: ' + (err.message || err));
+        }
+    });
 
     // Gallery save
     // Symbol palette click-to-place
