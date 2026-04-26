@@ -418,5 +418,22 @@ export const keycapJa = {
     mobile_genmode: "生成モード",
     mobile_genmode_target: "対象",
     mobile_gumball: "ガムボール",
-    mobile_export: "出力"
+    mobile_export: "出力",
+
+    // Phase 9 Keycap アシスト
+    h_keycap_assist: "アシスト機能",
+    lbl_material_preset: "素材プリセット", btn_apply_material: "適用",
+    lbl_engrave_preset: "文字彫刻プリセット",
+    opt_engrave_fdm: "FDM 向け", opt_engrave_resin: "レジン向け", opt_engrave_laser: "レーザー風", opt_engrave_inlay: "インレイ向け",
+    btn_profile_compare: "プロファイル比較", btn_stem_strength: "ステム強度チェック", btn_clearance_check: "押下クリアランス検査",
+    lbl_row_batch: "行別一括生成",
+    btn_theme_save: "現在の設定をテーマ保存", btn_theme_load: "テーマ一覧",
+    lbl_safe_area: "トップ面安全領域を表示", btn_print_sheet: "実寸チェックシート (SVG)",
+
+    // Phase 10+ 共通ツール
+    tools_title: "ツール",
+    tool_screenshot: "📷 スクリーンショット (PNG)",
+    tool_cost: "💰 コスト見積もり",
+    tool_diagnostic: "🔧 エラー診断",
+    tool_history: "📜 履歴一覧"
 };

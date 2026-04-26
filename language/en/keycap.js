@@ -417,5 +417,22 @@ export const keycapEn = {
     mobile_genmode: "Gen Mode",
     mobile_genmode_target: "Target",
     mobile_gumball: "Gumball",
-    mobile_export: "Export"
+    mobile_export: "Export",
+
+    // Phase 9 Keycap Assist
+    h_keycap_assist: "Assist Tools",
+    lbl_material_preset: "Material preset", btn_apply_material: "Apply",
+    lbl_engrave_preset: "Engrave depth preset",
+    opt_engrave_fdm: "FDM (deep)", opt_engrave_resin: "Resin (shallow)", opt_engrave_laser: "Laser (very shallow)", opt_engrave_inlay: "Inlay (deep)",
+    btn_profile_compare: "Compare profiles", btn_stem_strength: "Stem strength check", btn_clearance_check: "Press clearance check",
+    lbl_row_batch: "Row generator",
+    btn_theme_save: "Save current as theme", btn_theme_load: "Theme list",
+    lbl_safe_area: "Show top safe area", btn_print_sheet: "1:1 print sheet (SVG)",
+
+    // Phase 10+ Common Tools
+    tools_title: "Tools",
+    tool_screenshot: "📷 Screenshot (PNG)",
+    tool_cost: "💰 Cost estimate",
+    tool_diagnostic: "🔧 Diagnostics",
+    tool_history: "📜 History list"
 };

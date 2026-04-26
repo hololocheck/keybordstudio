@@ -2198,7 +2198,11 @@ var FontEngine3D = (() => {
                 convertedGlyphs: convertedCount,
                 errorGlyphs: errorCount,
                 totalMapped: charCodes.length,
-                type: formatStr
+                type: formatStr,
+                // Phase 10-B3: 可変フォント axes 情報のスタブ。
+                // 現状 fvar テーブルはパースしておらず、CFF2 はデフォルトインスタンスを使う。
+                // 将来 fvar をサポートしたら、ここに [{ tag, min, max, default }, ...] を入れる。
+                variableAxes: []
             }
         };
 
@@ -2312,6 +2316,13 @@ ${paths}</svg>`;
     // キャッシュヒット時はテッセレーションをスキップし、offsetX を加算しながら THREE.Shape を組むだけで済む。
     const _glyphSubpathCache = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
 
+    // Phase 10-B5: グリフキャッシュ統計 (ヒット/ミス回数とおおよそのサイズ)
+    // WeakMap はサイズを直接読めないため、glyph オブジェクトをキーに別途
+    // Set 風カウンタを保持する。漏れる可能性はあるが概算として十分。
+    let _cacheHits = 0;
+    let _cacheMisses = 0;
+    const _trackedGlyphs = (typeof Set !== 'undefined') ? new Set() : null;
+
     function createTextShapes(THREE, typefaceJSON, text, options) {
         options = options || {};
         const size = options.size || 80;
@@ -2360,16 +2371,28 @@ ${paths}</svg>`;
             let perGlyph = _glyphSubpathCache.get(glyph);
             if (perGlyph) {
                 const hit = perGlyph.get(key);
-                if (hit) return hit;
+                if (hit) { _cacheHits++; return hit; }
             } else {
                 perGlyph = new Map();
                 _glyphSubpathCache.set(glyph, perGlyph);
+                if (_trackedGlyphs) _trackedGlyphs.add(glyph);
             }
+            _cacheMisses++;
             const computed = _computeGlyphSubpaths(glyph.o, scale, divisions, reverseWinding);
             perGlyph.set(key, computed);
             return computed;
         }
+        _cacheMisses++;
         return _computeGlyphSubpaths(glyph.o, scale, divisions, reverseWinding);
+    }
+
+    // Phase 10-B5: キャッシュ統計を返す
+    function cacheStats() {
+        return {
+            size: _trackedGlyphs ? _trackedGlyphs.size : 0,
+            hits: _cacheHits,
+            misses: _cacheMisses
+        };
     }
 
     // 純データ（THREE非依存・offsetX=0）の subpath 計算。
@@ -2560,8 +2583,224 @@ ${paths}</svg>`;
         return inside;
     }
 
+    // =========================================================================
+    // Phase 10-B1: フォント診断
+    // typeface JSON に含まれる主要メタデータをまとめて返す。
+    // missingGlyphs は ASCII printable + 数字を念のためチェックする軽量サンプル。
+    // =========================================================================
+    function diagnose(typefaceJSON) {
+        const result = {
+            glyphCount: 0,
+            hasKerning: false,
+            kerningPairs: 0,
+            hasComposite: false,
+            missingGlyphs: [],
+            format: 'unknown'
+        };
+        if (!typefaceJSON || !typefaceJSON.glyphs) return result;
+
+        const glyphs = typefaceJSON.glyphs;
+        result.glyphCount = Object.keys(glyphs).length;
+
+        // 形式
+        if (typefaceJSON._meta && typefaceJSON._meta.type) {
+            result.format = typefaceJSON._meta.type;
+        } else if (typefaceJSON.original_font_information && typefaceJSON.original_font_information.format) {
+            result.format = typefaceJSON.original_font_information.format;
+        }
+
+        // カーニング
+        const kerning = typefaceJSON.kerning;
+        if (kerning && typeof kerning === 'object') {
+            const keys = Object.keys(kerning);
+            if (keys.length > 0) {
+                result.hasKerning = true;
+                let pairs = 0;
+                for (const k of keys) {
+                    const sub = kerning[k];
+                    if (sub && typeof sub === 'object') pairs += Object.keys(sub).length;
+                }
+                result.kerningPairs = pairs;
+            }
+        }
+
+        // composite glyph: 2dfont engine では composite を unrolled してから保存しているが、
+        // 元データに痕跡が残っているかをチェック (パスが空 + ha があるなど)
+        for (const ch in glyphs) {
+            const g = glyphs[ch];
+            if (g && g._composite) { result.hasComposite = true; break; }
+        }
+
+        // missingGlyphs: ASCII printable のごく一部をサンプルチェック
+        const sample = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (const ch of sample) {
+            if (!glyphs[ch]) result.missingGlyphs.push(ch);
+        }
+
+        return result;
+    }
+
+    // =========================================================================
+    // Phase 10-B2: アウトラインクリーンアップ (内部ヘルパー)
+    // 一部のスキャン由来フォントには「影スペック」と呼ばれる極小サブパスや
+    // 重複点が混じることがある。それらを取り除いた path 文字列を返す。
+    // - 連続する近接点 (1e-3未満) を1つに統合
+    // - 3点未満のサブパスを破棄
+    // - bbox面積 < opts.minArea のサブパスを破棄 (デフォ 0.5)
+    // 入力フォーマットは typeface.glyphs[c].o と同じ (m/l/q/b スペース区切り)。
+    // =========================================================================
+    function _cleanupOutline(pathStr, opts) {
+        opts = opts || {};
+        const eps = (typeof opts.epsilon === 'number') ? opts.epsilon : 1e-3;
+        const minArea = (typeof opts.minArea === 'number') ? opts.minArea : 0.5;
+        if (typeof pathStr !== 'string' || pathStr.length === 0) return '';
+
+        // サブパスごとにトークン群に切り分ける
+        const tokens = pathStr.split(' ').filter(t => t.length > 0);
+        const subPaths = [];
+        let current = null;
+        let i = 0;
+        let cx = 0, cy = 0;
+        while (i < tokens.length) {
+            const cmd = tokens[i];
+            if (cmd === 'm') {
+                const x = parseFloat(tokens[i+1]);
+                const y = parseFloat(tokens[i+2]);
+                current = { commands: [{ type: 'm', x, y }], pts: [{ x, y }],
+                            xMin: x, yMin: y, xMax: x, yMax: y };
+                subPaths.push(current);
+                cx = x; cy = y;
+                i += 3;
+            } else if (cmd === 'l') {
+                const x = parseFloat(tokens[i+1]);
+                const y = parseFloat(tokens[i+2]);
+                if (current) {
+                    const last = current.pts[current.pts.length - 1];
+                    if (Math.abs(last.x - x) > eps || Math.abs(last.y - y) > eps) {
+                        current.commands.push({ type: 'l', x, y });
+                        current.pts.push({ x, y });
+                        if (x < current.xMin) current.xMin = x;
+                        if (y < current.yMin) current.yMin = y;
+                        if (x > current.xMax) current.xMax = x;
+                        if (y > current.yMax) current.yMax = y;
+                    }
+                }
+                cx = x; cy = y;
+                i += 3;
+            } else if (cmd === 'q') {
+                const cpx = parseFloat(tokens[i+1]);
+                const cpy = parseFloat(tokens[i+2]);
+                const x   = parseFloat(tokens[i+3]);
+                const y   = parseFloat(tokens[i+4]);
+                if (current) {
+                    current.commands.push({ type: 'q', cpx, cpy, x, y });
+                    current.pts.push({ x, y });
+                    if (x < current.xMin) current.xMin = x;
+                    if (y < current.yMin) current.yMin = y;
+                    if (x > current.xMax) current.xMax = x;
+                    if (y > current.yMax) current.yMax = y;
+                }
+                cx = x; cy = y;
+                i += 5;
+            } else if (cmd === 'b') {
+                const c1x = parseFloat(tokens[i+1]);
+                const c1y = parseFloat(tokens[i+2]);
+                const c2x = parseFloat(tokens[i+3]);
+                const c2y = parseFloat(tokens[i+4]);
+                const x   = parseFloat(tokens[i+5]);
+                const y   = parseFloat(tokens[i+6]);
+                if (current) {
+                    current.commands.push({ type: 'b', c1x, c1y, c2x, c2y, x, y });
+                    current.pts.push({ x, y });
+                    if (x < current.xMin) current.xMin = x;
+                    if (y < current.yMin) current.yMin = y;
+                    if (x > current.xMax) current.xMax = x;
+                    if (y > current.yMax) current.yMax = y;
+                }
+                cx = x; cy = y;
+                i += 7;
+            } else {
+                i++;
+            }
+        }
+
+        // フィルタ: 3点未満 / bbox面積過小
+        const out = [];
+        for (const sp of subPaths) {
+            if (sp.pts.length < 3) continue;
+            const w = sp.xMax - sp.xMin;
+            const h = sp.yMax - sp.yMin;
+            if (w * h < minArea) continue;
+            for (const c of sp.commands) {
+                if (c.type === 'm')      out.push('m', c.x, c.y);
+                else if (c.type === 'l') out.push('l', c.x, c.y);
+                else if (c.type === 'q') out.push('q', c.cpx, c.cpy, c.x, c.y);
+                else if (c.type === 'b') out.push('b', c.c1x, c.c1y, c.c2x, c.c2y, c.x, c.y);
+            }
+        }
+        return out.join(' ');
+    }
+
+    // =========================================================================
+    // Phase 10-B4: 複数行レイアウト
+    // text を改行で分割して各行のメトリクス (行幅・行高・ベースラインY) を返す。
+    // 実際のシェイプ構築は行わない (呼び出し側が createTextShapes を別途使う想定)。
+    // 戻り値: { lines: [{line, width, height, baselineY}], lineHeight, totalHeight }
+    // - lineHeight = (ascender - descender) * scale * (options.lineSpacing || 1.2)
+    // - 1行目の baselineY は 0、2行目以降は -lineHeight ずつ下る (THREE座標系: Y上)
+    // =========================================================================
+    function layoutMultiline(typefaceJSON, text, options) {
+        options = options || {};
+        const size = options.size || 80;
+        const data = typefaceJSON || {};
+        const res = data.resolution || 1000;
+        const scale = size / res;
+        const ascender  = (typeof data.ascender  === 'number') ? data.ascender  : res * 0.8;
+        const descender = (typeof data.descender === 'number') ? data.descender : -res * 0.2;
+        const lineSpacing = (typeof options.lineSpacing === 'number') ? options.lineSpacing : 1.2;
+        const lineHeight = (ascender - descender) * scale * lineSpacing;
+        const glyphHeight = (ascender - descender) * scale;
+
+        const kerning = data.kerning || {};
+        const glyphs  = data.glyphs  || {};
+        const linesRaw = String(text == null ? '' : text).split('\n');
+        const lines = [];
+
+        for (let li = 0; li < linesRaw.length; li++) {
+            const line = linesRaw[li];
+            const chars = [...line];
+            let width = 0;
+            for (let ci = 0; ci < chars.length; ci++) {
+                const ch = chars[ci];
+                const g = glyphs[ch];
+                if (!g) {
+                    width += res * 0.3 * scale;
+                    continue;
+                }
+                width += (g.ha || 0) * scale;
+                if (ci + 1 < chars.length && kerning[ch]) {
+                    const k = kerning[ch][chars[ci + 1]];
+                    if (k) width += k * scale;
+                }
+            }
+            lines.push({
+                line,
+                width,
+                height: glyphHeight,
+                baselineY: -li * lineHeight
+            });
+        }
+
+        return {
+            lines,
+            lineHeight,
+            totalHeight: linesRaw.length > 0 ? (linesRaw.length - 1) * lineHeight + glyphHeight : 0
+        };
+    }
+
     // Public API
-    return { parse, createTextShapes, glyphToSVGPath, generateSVG };
+    return { parse, createTextShapes, glyphToSVGPath, generateSVG,
+             diagnose, layoutMultiline, cacheStats, _cleanupOutline };
 
 })();
 

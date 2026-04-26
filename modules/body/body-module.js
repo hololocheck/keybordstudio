@@ -87,7 +87,20 @@ const state = {
     // Phase 7-3: ケース断面ビュー
     crossSectionEnabled: false,
     crossSectionAxis: 'y',
-    crossSectionPos: 0
+    crossSectionPos: 0,
+    // Phase 9: アシスト機能
+    // 1. Weight & material estimate
+    assistMaterial: 'pla',
+    // 3. Insert (heat-set) guide
+    assistInsertSize: 'm3',
+    // 4. Gasket compression simulator
+    assistGasketThickness: 2.5,
+    assistGasketHardness: 50,
+    assistGasketCompression: 20,
+    // 5. Acoustic tuning preset
+    assistAcousticPreset: 'firm',
+    // 8. Variation generator (last applied — informational)
+    assistVariationApplied: null
 };
 
 // ── Body History System ───────────────────
@@ -2525,6 +2538,90 @@ function initBodySvgCategoryDropdown() {
 }
 
 // ── UI Binding ─────────────────────────────
+// ── Phase 9: アシスト機能ヘルパー ───────────────
+function estimateBodyVolume() {
+    const p = (typeof getParams === 'function') ? getParams() : null;
+    // Fallback: simple bbox from layout
+    const w = (p && p.totalW) || 380;
+    const d = (p && p.totalD) || 130;
+    const h = (state.bezelTop + state.bezelBottom + state.bottomThickness) || 25;
+    // Outer shell volume minus rough hollow
+    const outer = w * d * h;
+    const inner = (w - state.wallThickness * 2) * (d - state.wallThickness * 2) * (h - state.bottomThickness - 2);
+    return Math.max(0, outer - inner) / 1000; // cm³
+}
+function bodyMaterialPresets() {
+    return [
+        { id: 'pla', name: 'PLA', density: 1.24, pricePerKg: 25 },
+        { id: 'abs', name: 'ABS', density: 1.04, pricePerKg: 28 },
+        { id: 'petg', name: 'PETG', density: 1.27, pricePerKg: 28 },
+        { id: 'nylon', name: 'Nylon', density: 1.13, pricePerKg: 60 },
+        { id: 'resin', name: 'Resin', density: 1.10, pricePerKg: 70 }
+    ];
+}
+function suggestScrewPostPositions() {
+    const p = (typeof getParams === 'function') ? getParams() : null;
+    const w = (p && p.totalW) || 380;
+    const d = (p && p.totalD) || 130;
+    const margin = (state.bezelSide || 5) + 4;
+    const positions = [];
+    // 4 corners
+    positions.push({ x: -w / 2 + margin, z: -d / 2 + margin });
+    positions.push({ x:  w / 2 - margin, z: -d / 2 + margin });
+    positions.push({ x: -w / 2 + margin, z:  d / 2 - margin });
+    positions.push({ x:  w / 2 - margin, z:  d / 2 - margin });
+    // Every ~85mm along long edges
+    const usableW = w - margin * 2;
+    const stepCount = Math.max(0, Math.floor(usableW / 85) - 1);
+    if (stepCount > 0) {
+        const step = usableW / (stepCount + 1);
+        for (let i = 1; i <= stepCount; i++) {
+            const xPos = -w / 2 + margin + step * i;
+            positions.push({ x: xPos, z: -d / 2 + margin });
+            positions.push({ x: xPos, z:  d / 2 - margin });
+        }
+    }
+    return positions;
+}
+const INSERT_GUIDE = {
+    m2:   { name: 'M2',   hole: 3.2, depth: 4.0, clearance: 0.1 },
+    m2_5: { name: 'M2.5', hole: 3.5, depth: 5.0, clearance: 0.1 },
+    m3:   { name: 'M3',   hole: 4.0, depth: 5.5, clearance: 0.15 }
+};
+const ACOUSTIC_PRESETS = {
+    hollow: { wallThickness: 1.5, pcbClearance: 5, bottomThickness: 2.0, ribs: false },
+    bass:   { wallThickness: 3.5, pcbClearance: 4, bottomThickness: 4.0, ribs: true },
+    firm:   { wallThickness: 4.0, pcbClearance: 2, bottomThickness: 5.0, ribs: true },
+    silent: { wallThickness: 3.0, pcbClearance: 3, bottomThickness: 3.5, ribs: true },
+    foam:   { wallThickness: 2.5, pcbClearance: 6, bottomThickness: 3.0, ribs: false }
+};
+const USB_PORT_TEMPLATES = {
+    'usb-c':     { name: 'USB-C',         w: 10.0, h: 3.2 },
+    'mini-usb':  { name: 'Mini-B',        w:  7.5, h: 3.5 },
+    'micro-usb': { name: 'Micro-B',       w:  8.0, h: 3.0 },
+    'trrs':      { name: 'TRRS / 3.5mm',  w:  6.0, h: 6.0 }
+};
+function computeTiltGeometry() {
+    const angle = state.tiltAngle || 0;
+    const totalH = (state.bezelTop + state.bezelBottom + state.bottomThickness) || 25;
+    const totalD = 130; // approximate
+    const rearLift = totalD * Math.sin(angle * Math.PI / 180);
+    return { angle, frontH: totalH, rearH: totalH + rearLift, typingAngle: angle };
+}
+const VARIATION_PRESETS = {
+    low:      { profileType: 'low',  bezelTop: 3, bezelBottom: 5, bottomThickness: 2 },
+    standard: { profileType: 'mid',  bezelTop: 5, bezelBottom: 8, bottomThickness: 2.5 },
+    high:     { profileType: 'high', bezelTop: 8, bezelBottom: 12, bottomThickness: 3 },
+    wedge:    { profileType: 'high', tiltAngle: 7, bezelTop: 5, bezelBottom: 12 },
+    floating: { profileType: 'low',  bezelTop: 2, bezelBottom: 4, wallThickness: 2 }
+};
+function bodyAssistShowResult(html) {
+    const el = document.getElementById('body-assist-result');
+    if (!el) return;
+    el.style.display = '';
+    el.innerHTML = html;
+}
+
 function bindUI() {
     document.querySelectorAll('.layout-preset-btn').forEach(b => {
         b.addEventListener('click', () => {
@@ -2861,6 +2958,162 @@ function bindUI() {
         const vEl = document.getElementById('v-body-cross-section-pos');
         if (vEl) vEl.textContent = e.target.value;
         requestBodyUpdate();
+    });
+
+    // ── Phase 9: アシスト機能 ──────────────────
+    // 1. Weight & material estimate
+    const matSel = document.getElementById('body-assist-material');
+    if (matSel) {
+        matSel.value = state.assistMaterial;
+        matSel.addEventListener('change', () => { state.assistMaterial = matSel.value; });
+    }
+    document.getElementById('body-assist-weight-btn')?.addEventListener('click', () => {
+        const presets = bodyMaterialPresets();
+        const mat = presets.find(p => p.id === state.assistMaterial) || presets[0];
+        const volCm3 = estimateBodyVolume();
+        const weightG = volCm3 * mat.density;
+        const costUSD = (weightG / 1000) * mat.pricePerKg;
+        bodyAssistShowResult(
+            '<b>重量・コスト推定 / Weight &amp; Cost</b><br>' +
+            '材料 / Material: ' + mat.name + '<br>' +
+            '体積 / Volume: ' + volCm3.toFixed(1) + ' cm³<br>' +
+            '密度 / Density: ' + mat.density.toFixed(2) + ' g/cm³<br>' +
+            '推定重量 / Est. Weight: <b>' + weightG.toFixed(1) + ' g</b><br>' +
+            '推定コスト / Est. Cost: <b>$' + costUSD.toFixed(2) + '</b> (@$' + mat.pricePerKg + '/kg)'
+        );
+    });
+
+    // 2. Screw post auto-placement
+    document.getElementById('body-assist-screwpost-btn')?.addEventListener('click', () => {
+        const positions = suggestScrewPostPositions();
+        let html = '<b>ネジ柱推奨位置 / Suggested Screw Posts</b> (' + positions.length + ' 箇所)<br>';
+        html += '<table style="width:100%; font-size:0.7rem; margin-top:4px; border-collapse:collapse;">';
+        html += '<tr style="color:#888;"><th style="text-align:left;">#</th><th style="text-align:right;">X (mm)</th><th style="text-align:right;">Z (mm)</th></tr>';
+        positions.forEach((p, i) => {
+            html += '<tr><td>' + (i + 1) + '</td><td style="text-align:right;">' + p.x.toFixed(1) + '</td><td style="text-align:right;">' + p.z.toFixed(1) + '</td></tr>';
+        });
+        html += '</table>';
+        bodyAssistShowResult(html);
+    });
+
+    // 3. Insert (heat-set) guide
+    const insSel = document.getElementById('body-assist-insert');
+    if (insSel) {
+        insSel.value = state.assistInsertSize;
+        insSel.addEventListener('change', () => { state.assistInsertSize = insSel.value; });
+    }
+    document.getElementById('body-assist-insert-btn')?.addEventListener('click', () => {
+        const g = INSERT_GUIDE[state.assistInsertSize] || INSERT_GUIDE.m3;
+        const html =
+            '<b>インサート寸法 / Heat-set Insert</b><br>' +
+            'サイズ / Size: <b>' + g.name + '</b><br>' +
+            '穴径 / Hole Diameter: <b>' + g.hole.toFixed(1) + ' mm</b><br>' +
+            '深さ / Pocket Depth: <b>' + g.depth.toFixed(1) + ' mm</b><br>' +
+            'クリアランス / Clearance: ' + g.clearance.toFixed(2) + ' mm';
+        bodyAssistShowResult(html);
+        if (typeof showToast === 'function') showToast(g.name + ': φ' + g.hole + 'mm × ' + g.depth + 'mm');
+    });
+
+    // 4. Gasket compression simulator
+    const gThick = document.getElementById('body-assist-gasket-thickness');
+    const gHard = document.getElementById('body-assist-gasket-hardness');
+    const gCompr = document.getElementById('body-assist-gasket-compression');
+    if (gThick) {
+        gThick.value = state.assistGasketThickness;
+        gThick.addEventListener('input', () => { state.assistGasketThickness = parseFloat(gThick.value) || 2.5; });
+    }
+    if (gHard) {
+        gHard.value = state.assistGasketHardness;
+        gHard.addEventListener('input', () => { state.assistGasketHardness = parseFloat(gHard.value) || 50; });
+    }
+    if (gCompr) {
+        gCompr.value = state.assistGasketCompression;
+        gCompr.addEventListener('input', () => { state.assistGasketCompression = parseFloat(gCompr.value) || 20; });
+    }
+    document.getElementById('body-assist-gasket-btn')?.addEventListener('click', () => {
+        const t = state.assistGasketThickness || 2.5;
+        const c = state.assistGasketCompression || 20;
+        const h = state.assistGasketHardness || 50;
+        const recommendedH = state.bezelTop + state.bezelBottom - t * (1 - c / 100);
+        const compressedT = t * (1 - c / 100);
+        bodyAssistShowResult(
+            '<b>ガスケット圧縮 / Gasket Compression</b><br>' +
+            '厚み / Thickness: ' + t.toFixed(2) + ' mm<br>' +
+            '硬度 / Hardness: Shore A ' + h + '<br>' +
+            '圧縮率 / Compression: ' + c + '%<br>' +
+            '圧縮後厚み / Compressed Thickness: ' + compressedT.toFixed(2) + ' mm<br>' +
+            '推奨内部高さ / Recommended Internal Height: <b>' + recommendedH.toFixed(2) + ' mm</b>'
+        );
+    });
+
+    // 5. Acoustic tuning preset
+    const acSel = document.getElementById('body-assist-acoustic');
+    if (acSel) {
+        acSel.value = state.assistAcousticPreset;
+        acSel.addEventListener('change', () => { state.assistAcousticPreset = acSel.value; });
+    }
+    document.getElementById('body-assist-acoustic-btn')?.addEventListener('click', () => {
+        const preset = ACOUSTIC_PRESETS[state.assistAcousticPreset] || ACOUSTIC_PRESETS.firm;
+        Object.assign(state, preset);
+        if (typeof bodySyncUI === 'function') bodySyncUI();
+        requestBodyUpdate();
+        bodyCommitHistory();
+        bodyAssistShowResult(
+            '<b>音響プリセット適用 / Acoustic Preset</b>: ' + state.assistAcousticPreset + '<br>' +
+            'wallThickness: ' + preset.wallThickness + ' mm<br>' +
+            'pcbClearance: ' + preset.pcbClearance + ' mm<br>' +
+            'bottomThickness: ' + preset.bottomThickness + ' mm<br>' +
+            'ribs: ' + (preset.ribs ? 'ON' : 'OFF')
+        );
+        if (typeof showToast === 'function') showToast('Acoustic preset: ' + state.assistAcousticPreset);
+    });
+
+    // 6. USB port template
+    document.getElementById('body-assist-usb-btn')?.addEventListener('click', () => {
+        const t = USB_PORT_TEMPLATES[state.usbType] || USB_PORT_TEMPLATES['usb-c'];
+        let dimStr;
+        if (state.usbType === 'trrs') {
+            dimStr = 'φ' + t.w.toFixed(1) + ' mm';
+        } else {
+            dimStr = t.w.toFixed(1) + ' × ' + t.h.toFixed(1) + ' mm';
+        }
+        bodyAssistShowResult(
+            '<b>USBポート / USB Port Template</b><br>' +
+            '選択中 / Selected: <b>' + t.name + '</b><br>' +
+            '開口寸法 / Cutout: ' + dimStr + '<br>' +
+            'ポートマージン / Margin: ' + (state.portMargin || 0.5).toFixed(2) + ' mm'
+        );
+    });
+
+    // 7. Tilt angle verification
+    document.getElementById('body-assist-tilt-btn')?.addEventListener('click', () => {
+        const g = computeTiltGeometry();
+        bodyAssistShowResult(
+            '<b>タイピング角度検証 / Typing Angle Verification</b><br>' +
+            '入力角度 / Input Angle: <b>' + g.angle.toFixed(1) + '°</b><br>' +
+            '前縁高さ / Front Height: ' + g.frontH.toFixed(1) + ' mm<br>' +
+            '後縁高さ / Rear Height: <b>' + g.rearH.toFixed(1) + ' mm</b><br>' +
+            '実効タイピング角度 / Effective Typing Angle: ' + g.typingAngle.toFixed(1) + '°'
+        );
+    });
+
+    // 8. Variation generator
+    document.querySelectorAll('.body-assist-var-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.dataset.variation;
+            const preset = VARIATION_PRESETS[key];
+            if (!preset) return;
+            Object.assign(state, preset);
+            state.assistVariationApplied = key;
+            if (typeof bodySyncUI === 'function') bodySyncUI();
+            requestBodyUpdate();
+            bodyCommitHistory();
+            const lines = Object.entries(preset).map(([k, v]) => k + ': ' + v).join('<br>');
+            bodyAssistShowResult(
+                '<b>バリエーション適用 / Variation</b>: ' + key + '<br>' + lines
+            );
+            if (typeof showToast === 'function') showToast('Variation: ' + key);
+        });
     });
 }
 

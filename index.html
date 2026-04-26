@@ -9211,6 +9211,53 @@
                         <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="cross_section_note">※ 表示専用機能です。STL/3MF 出力には影響しません。</p>
                     </div>
 
+                    <h3 id="sec-keycap-assist" data-mode="advanced" data-i18n="h_keycap_assist">アシスト機能</h3>
+                    <div class="control-group" id="keycap-assist-group">
+                        <!-- 1. 素材別補正プリセット -->
+                        <label data-i18n="lbl_material_preset">素材プリセット</label>
+                        <div class="control-row">
+                            <select id="keycap-material-preset" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; flex:1; font-size:0.85rem; border-radius:3px;">
+                                <option value="pla">PLA</option>
+                                <option value="abs">ABS</option>
+                                <option value="petg">PETG</option>
+                                <option value="resin">レジン</option>
+                            </select>
+                            <button id="keycap-apply-material" class="btn-small secondary" style="border-color:#4fc3f7; color:#4fc3f7;" data-i18n="btn_apply_material">適用</button>
+                        </div>
+                        <!-- 2. 文字彫刻深さプリセット -->
+                        <label style="margin-top:8px;" data-i18n="lbl_engrave_preset">文字彫刻プリセット</label>
+                        <select id="keycap-engrave-preset" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.85rem; border-radius:3px;">
+                            <option value="fdm" data-i18n="opt_engrave_fdm">FDM 向け (深め)</option>
+                            <option value="resin" data-i18n="opt_engrave_resin">レジン向け (浅め)</option>
+                            <option value="laser" data-i18n="opt_engrave_laser">レーザー風 (極浅)</option>
+                            <option value="inlay" data-i18n="opt_engrave_inlay">インレイ向け (深い)</option>
+                        </select>
+                        <!-- 3. プロファイル比較ビュー -->
+                        <button id="keycap-profile-compare-btn" class="btn-small secondary" style="margin-top:8px; width:100%; border-color:#ba68c8; color:#ba68c8;" data-i18n="btn_profile_compare">プロファイル比較</button>
+                        <!-- 4. ステム強度チェック -->
+                        <button id="keycap-stem-strength-btn" class="btn-small secondary" style="margin-top:6px; width:100%; border-color:#ffb74d; color:#ffb74d;" data-i18n="btn_stem_strength">ステム強度チェック</button>
+                        <!-- 5. 押下クリアランス検査 -->
+                        <button id="keycap-clearance-btn" class="btn-small secondary" style="margin-top:6px; width:100%; border-color:#ffb74d; color:#ffb74d;" data-i18n="btn_clearance_check">押下クリアランス検査</button>
+                        <!-- 6. 行別一括生成 -->
+                        <label style="margin-top:8px;" data-i18n="lbl_row_batch">行別一括生成</label>
+                        <div class="control-row">
+                            <button class="btn-small secondary keycap-row-btn" data-row="r1">R1</button>
+                            <button class="btn-small secondary keycap-row-btn" data-row="r2">R2</button>
+                            <button class="btn-small secondary keycap-row-btn" data-row="r3">R3</button>
+                            <button class="btn-small secondary keycap-row-btn" data-row="r4">R4</button>
+                            <button class="btn-small secondary keycap-row-btn" data-row="f-row">F</button>
+                        </div>
+                        <!-- 7. キーセットテーマ管理 -->
+                        <button id="keycap-theme-save-btn" class="btn-small secondary" style="margin-top:8px; width:100%; border-color:#4caf50; color:#4caf50;" data-i18n="btn_theme_save">現在の設定をテーマ保存</button>
+                        <button id="keycap-theme-load-btn" class="btn-small secondary" style="margin-top:4px; width:100%; border-color:#4caf50; color:#4caf50;" data-i18n="btn_theme_load">テーマ一覧</button>
+                        <!-- 8. トップ面安全領域 -->
+                        <label class="toggle-switch" style="margin-top:8px;"><input type="checkbox" id="keycap-safe-area-toggle" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_safe_area">トップ面安全領域を表示</span></label>
+                        <!-- 9. 実寸印刷チェックシート (SVG) -->
+                        <button id="keycap-print-sheet-btn" class="btn-small secondary" style="margin-top:8px; width:100%; border-color:#26c6da; color:#26c6da;" data-i18n="btn_print_sheet">実寸チェックシート (SVG)</button>
+                        <!-- 結果表示 -->
+                        <div id="keycap-assist-result" style="display:none; margin-top:10px; padding:8px 10px; background:rgba(255,255,255,0.04); border-left:3px solid #ba68c8; border-radius:3px; font-size:0.74rem; line-height:1.5; max-height:300px; overflow-y:auto;"></div>
+                    </div>
+
                     <h3 id="sec-color" data-i18n="h_colors">色設定</h3>
 
                     <!-- V67: AMS連携カラーパレット (ドロップダウン統合) -->
@@ -12460,7 +12507,13 @@ result
             // 断面ビュー: 内部構造（肉厚・ステム・カーブ）を確認するためのクリッピング表示
             crossSectionEnabled: false,
             crossSectionAxis: 'y',    // 'x' | 'y' | 'z'
-            crossSectionPos: 0
+            crossSectionPos: 0,
+            // Phase 9 Keycap (材料・テーマ・行)
+            materialPreset: 'pla',         // 'pla' | 'abs' | 'petg' | 'resin'
+            keycapRow: 'r3',               // 'r1' | 'r2' | 'r3' | 'r4' | 'f-row'
+            currentTheme: null,            // セットテーマ名
+            showSafeArea: false,           // トップ面安全領域 HUD
+            engraveDepthPreset: 'fdm'      // 'fdm' | 'resin' | 'laser' | 'inlay'
         };
         let state = JSON.parse(JSON.stringify(initialState));
         let importedModelBuffer = null;
@@ -32384,6 +32437,169 @@ ${triangles.join('\n')}
             });
         })();
 
+        // Phase 9 Keycap: アシスト機能 (素材プリセット / プロファイル比較 / ステム強度 等)
+        (function () {
+            const MATERIAL_PRESETS = {
+                pla:   { stemClearance: 0.30, wallThickness: 1.5, textHeight: 0.5 },
+                abs:   { stemClearance: 0.25, wallThickness: 1.5, textHeight: 0.5 },
+                petg:  { stemClearance: 0.35, wallThickness: 1.6, textHeight: 0.6 },
+                resin: { stemClearance: 0.18, wallThickness: 1.2, textHeight: 0.3 }
+            };
+            const ENGRAVE_PRESETS = {
+                fdm:   0.6,
+                resin: 0.3,
+                laser: 0.1,
+                inlay: 1.2
+            };
+            function showAssistResult(html) {
+                const out = document.getElementById('keycap-assist-result');
+                if (!out) return;
+                out.innerHTML = html;
+                out.style.display = '';
+            }
+            function applyMaterialPreset() {
+                const sel = document.getElementById('keycap-material-preset');
+                if (!sel) return;
+                const p = MATERIAL_PRESETS[sel.value];
+                if (!p) return;
+                Object.assign(state, p);
+                state.materialPreset = sel.value;
+                if (typeof syncUI === 'function') syncUI();
+                if (typeof requestUpdate === 'function') requestUpdate();
+                showAssistResult(`<div style="color:#69f0ae;">✅ ${sel.value.toUpperCase()} プリセット適用: クリアランス ${p.stemClearance}mm / 壁厚 ${p.wallThickness}mm / 文字深さ ${p.textHeight}mm</div>`);
+            }
+            function applyEngravePreset() {
+                const sel = document.getElementById('keycap-engrave-preset');
+                if (!sel) return;
+                const depth = ENGRAVE_PRESETS[sel.value];
+                if (depth == null) return;
+                state.textHeight = depth;
+                state.engraveDepthPreset = sel.value;
+                if (typeof syncUI === 'function') syncUI();
+                if (typeof requestUpdate === 'function') requestUpdate();
+                showAssistResult(`<div style="color:#69f0ae;">✅ 文字彫刻深さを ${depth}mm に設定 (${sel.value})</div>`);
+            }
+            function showProfileCompare() {
+                const profiles = ['cherry', 'oem', 'sa', 'xda', 'dsa'];
+                let html = '<div style="font-weight:bold; margin-bottom:6px;">プロファイル比較 (高さ・形状)</div><table style="width:100%; font-size:0.75rem;">';
+                html += '<tr><th>プロファイル</th><th>高さ目安</th><th>傾き</th></tr>';
+                const data = {
+                    cherry: { h: '~9.4mm', tilt: '中' },
+                    oem:    { h: '~9.4mm', tilt: '中(高め)' },
+                    sa:     { h: '~16.5mm', tilt: '強い (球面)' },
+                    xda:    { h: '~9.0mm', tilt: '無し (フラット)' },
+                    dsa:    { h: '~7.4mm', tilt: '無し (フラット)' }
+                };
+                for (const p of profiles) {
+                    const cur = state.profile === p ? '✓ ' : '';
+                    html += `<tr><td>${cur}${p.toUpperCase()}</td><td>${data[p].h}</td><td>${data[p].tilt}</td></tr>`;
+                }
+                html += '</table>';
+                showAssistResult(html);
+            }
+            function checkStemStrength() {
+                const issues = [];
+                const ok = [];
+                if (state.wallThickness < 1.2) issues.push(`壁厚 ${state.wallThickness}mm が薄すぎる (1.2mm以上推奨)`);
+                else ok.push(`壁厚 ${state.wallThickness}mm`);
+                if (!state.enableRibs) issues.push('補強リブ OFF (Cherry MX には ON 推奨)');
+                else ok.push('補強リブ ON');
+                if (state.stemClearance > 0.4) issues.push(`クリアランス ${state.stemClearance}mm が大きすぎ`);
+                else ok.push(`クリアランス ${state.stemClearance}mm`);
+                let html = issues.length ? `<div style="color:#ff9800;">⚠️ ${issues.length} 件の指摘</div><ul>` : `<div style="color:#69f0ae;">✅ ステム強度 OK</div><ul>`;
+                for (const i of issues) html += `<li style="color:#ffb74d;">${i}</li>`;
+                for (const o of ok) html += `<li style="color:#aaa; font-size:0.7rem;">✓ ${o}</li>`;
+                html += '</ul>';
+                showAssistResult(html);
+            }
+            function checkClearance() {
+                const issues = [];
+                if (state.uSize > 1.7 && state.stabilizerType === 'none') issues.push(`${state.uSize}u にスタビライザー無し`);
+                if (state.profile === 'sa' && state.row === 'R1') issues.push('SA R1 は隣接干渉に注意');
+                const html = issues.length ? `<div style="color:#ff9800;">⚠️ クリアランス警告</div><ul>${issues.map(i=>`<li>${i}</li>`).join('')}</ul>` : `<div style="color:#69f0ae;">✅ クリアランス OK</div>`;
+                showAssistResult(html);
+            }
+            function genRow(rowName) {
+                state.row = rowName.toUpperCase().replace('F-ROW', 'F');
+                if (rowName === 'r1') state.row = 'R1';
+                else if (rowName === 'r2') state.row = 'R2';
+                else if (rowName === 'r3') state.row = 'R3';
+                else if (rowName === 'r4') state.row = 'R4';
+                else if (rowName === 'f-row') state.row = 'F';
+                state.keycapRow = rowName;
+                if (typeof syncUI === 'function') syncUI();
+                if (typeof requestUpdate === 'function') requestUpdate();
+                showAssistResult(`<div>行 ${state.row} を適用しました。エクスポートして1キー出力できます。</div>`);
+            }
+            function saveTheme() {
+                const name = prompt('テーマ名を入力:', '');
+                if (!name) return;
+                const theme = {
+                    colBody: state.colBody, colText: state.colText,
+                    font: state.font, textMode: state.textMode,
+                    posX: state.posX, posZ: state.posZ,
+                    profile: state.profile, dishType: state.dishType
+                };
+                try {
+                    const all = JSON.parse(localStorage.getItem('kbs_keycap_themes') || '{}');
+                    all[name] = theme;
+                    localStorage.setItem('kbs_keycap_themes', JSON.stringify(all));
+                    state.currentTheme = name;
+                    showAssistResult(`<div style="color:#69f0ae;">✅ テーマ「${name}」を保存しました</div>`);
+                } catch (e) { showAssistResult(`<div style="color:#ff5252;">保存失敗: ${e.message}</div>`); }
+            }
+            function listThemes() {
+                const all = JSON.parse(localStorage.getItem('kbs_keycap_themes') || '{}');
+                const names = Object.keys(all);
+                if (names.length === 0) { showAssistResult('<div>テーマがまだ保存されていません。</div>'); return; }
+                let html = '<div style="font-weight:bold; margin-bottom:4px;">保存済みテーマ</div><ul>';
+                for (const n of names) html += `<li><a href="#" data-theme="${n}" class="theme-load-link" style="color:#4fc3f7;">${n}</a> <button class="theme-delete-btn" data-theme="${n}" style="background:none; border:none; color:#ff5252; cursor:pointer;">削除</button></li>`;
+                html += '</ul>';
+                showAssistResult(html);
+                document.querySelectorAll('.theme-load-link').forEach(a => a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const t = all[e.target.dataset.theme];
+                    if (t) {
+                        Object.assign(state, t);
+                        state.currentTheme = e.target.dataset.theme;
+                        if (typeof syncUI === 'function') syncUI();
+                        if (typeof requestUpdate === 'function') requestUpdate();
+                        showAssistResult(`<div style="color:#69f0ae;">✅ テーマ「${e.target.dataset.theme}」を適用</div>`);
+                    }
+                }));
+                document.querySelectorAll('.theme-delete-btn').forEach(b => b.addEventListener('click', (e) => {
+                    delete all[e.target.dataset.theme];
+                    localStorage.setItem('kbs_keycap_themes', JSON.stringify(all));
+                    listThemes();
+                }));
+            }
+            function toggleSafeArea() {
+                state.showSafeArea = document.getElementById('keycap-safe-area-toggle').checked;
+                if (typeof requestUpdate === 'function') requestUpdate();
+                showAssistResult(`<div>安全領域 ${state.showSafeArea ? 'ON' : 'OFF'}</div>`);
+            }
+            function exportPrintSheet() {
+                // 1u = 19.05mm, 1mm = 3.78px @96dpi
+                const w = (state.uSize || 1) * 19.05;
+                const h = 19.05;
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="black" stroke-width="0.2"/><text x="${w/2}" y="${h/2}" text-anchor="middle" font-size="3" fill="black">${(state.text || 'A').replace(/[<>&]/g,'')}</text></svg>`;
+                const blob = new Blob([svg], { type: 'image/svg+xml' });
+                if (typeof saveAs === 'function') saveAs(blob, 'keycap-print-sheet.svg');
+                showAssistResult(`<div>実寸 SVG をダウンロード (${w}×${h}mm)</div>`);
+            }
+            // Wire up
+            document.getElementById('keycap-apply-material')?.addEventListener('click', applyMaterialPreset);
+            document.getElementById('keycap-engrave-preset')?.addEventListener('change', applyEngravePreset);
+            document.getElementById('keycap-profile-compare-btn')?.addEventListener('click', showProfileCompare);
+            document.getElementById('keycap-stem-strength-btn')?.addEventListener('click', checkStemStrength);
+            document.getElementById('keycap-clearance-btn')?.addEventListener('click', checkClearance);
+            document.querySelectorAll('.keycap-row-btn').forEach(b => b.addEventListener('click', (e) => genRow(e.target.dataset.row)));
+            document.getElementById('keycap-theme-save-btn')?.addEventListener('click', saveTheme);
+            document.getElementById('keycap-theme-load-btn')?.addEventListener('click', listThemes);
+            document.getElementById('keycap-safe-area-toggle')?.addEventListener('change', toggleSafeArea);
+            document.getElementById('keycap-print-sheet-btn')?.addEventListener('click', exportPrintSheet);
+        })();
+
         // Phase 6-2: 基本/詳細モード
         // h3[data-mode="advanced"] とその「次の h3 まで」の兄弟要素を一括で hide/show する。
         // ユーザーの選択は localStorage に保存し、リロード後も維持する。
@@ -32437,7 +32653,181 @@ ${triangles.join('\n')}
         <button id="qa-preflight" class="qa-button" title="Pre-flight check" aria-label="Pre-flight">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
         </button>
+        <button id="qa-tools" class="qa-button" title="Tools (screenshot / cost / diagnostic / history)" aria-label="Tools">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+        </button>
     </div>
+
+    <!-- Phase 10+ Common Tools Modal (Screenshot / Cost / Diagnostic / History) -->
+    <div id="tools-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9998; display:none; align-items:center; justify-content:center;">
+        <div style="background:#1a1a2e; padding:20px 24px; border-radius:8px; max-width:600px; width:90%; max-height:80vh; overflow:auto; border:1px solid #00e5ff; box-shadow:0 0 24px rgba(0,229,255,0.25);">
+            <h3 style="color:#00e5ff; margin:0 0 12px 0; border-bottom:1px solid #444; padding-bottom:8px;" data-i18n="tools_title">ツール</h3>
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+                <button id="tool-screenshot" class="secondary btn-small" style="border-color:#4fc3f7; color:#4fc3f7; padding:10px;" data-i18n="tool_screenshot">📷 スクリーンショット (PNG)</button>
+                <button id="tool-cost" class="secondary btn-small" style="border-color:#69f0ae; color:#69f0ae; padding:10px;" data-i18n="tool_cost">💰 コスト見積もり</button>
+                <button id="tool-diagnostic" class="secondary btn-small" style="border-color:#ffb74d; color:#ffb74d; padding:10px;" data-i18n="tool_diagnostic">🔧 エラー診断</button>
+                <button id="tool-history" class="secondary btn-small" style="border-color:#ba68c8; color:#ba68c8; padding:10px;" data-i18n="tool_history">📜 履歴一覧</button>
+            </div>
+            <div id="tools-result" style="margin-top:14px; padding:10px 12px; background:rgba(0,0,0,0.3); border-radius:4px; font-size:0.82rem; line-height:1.5; min-height:40px; max-height:380px; overflow:auto; display:none;"></div>
+            <div style="margin-top:14px; text-align:right;">
+                <button id="btn-close-tools" class="secondary btn-small" style="border-color:#00e5ff; color:#00e5ff;" data-i18n="btn_close">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Phase 10+ Common Tools — 3 Studio 共通の補助ツール (スクショ / コスト / 診断 / 履歴)
+        (function () {
+            const _errorLog = [];
+            const _MAX_ERRORS = 50;
+            window.addEventListener('error', (e) => {
+                _errorLog.push({ ts: Date.now(), kind: 'error', msg: e.message || String(e), src: e.filename, line: e.lineno });
+                if (_errorLog.length > _MAX_ERRORS) _errorLog.shift();
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+                _errorLog.push({ ts: Date.now(), kind: 'unhandledrejection', msg: (e.reason && (e.reason.message || e.reason.toString())) || 'Unknown rejection' });
+                if (_errorLog.length > _MAX_ERRORS) _errorLog.shift();
+            });
+            function showResult(html) {
+                const out = document.getElementById('tools-result');
+                if (!out) return;
+                out.innerHTML = html;
+                out.style.display = '';
+            }
+            function takeScreenshot() {
+                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
+                const canvas = (cur === 'layout')
+                    ? document.querySelector('#layout-canvas-container canvas')
+                    : document.querySelector('#canvas-container canvas');
+                if (!canvas) { showResult('<div style="color:#ff5252;">⚠️ canvas が見つかりません</div>'); return; }
+                try {
+                    canvas.toBlob((blob) => {
+                        if (!blob) { showResult('<div style="color:#ff5252;">⚠️ 画像生成に失敗</div>'); return; }
+                        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const fname = `KeybordStudio_${cur}_${stamp}.png`;
+                        if (typeof saveAs === 'function') {
+                            saveAs(blob, fname);
+                        } else {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url; a.download = fname;
+                            a.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        }
+                        showResult(`<div style="color:#69f0ae;">✅ 保存完了: ${fname} (${(blob.size/1024).toFixed(1)} KB)</div>`);
+                    }, 'image/png');
+                } catch (err) {
+                    showResult(`<div style="color:#ff5252;">⚠️ ${err.message || err}</div>`);
+                }
+            }
+            function showCostEstimate() {
+                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
+                const PRICES = {
+                    pla:   { density: 1.24, perKg: 25 },
+                    abs:   { density: 1.04, perKg: 28 },
+                    petg:  { density: 1.27, perKg: 28 },
+                    nylon: { density: 1.13, perKg: 60 },
+                    resin: { density: 1.10, perKg: 70 }
+                };
+                let html = `<div style="font-weight:bold; margin-bottom:6px;">コスト見積もり (${cur})</div>`;
+                let volCm3 = 0;
+                if (cur === 'keycap') {
+                    try {
+                        const p = (typeof getParams === 'function') ? getParams() : null;
+                        if (p) {
+                            const fillFactor = 0.22 + ((state.wallThickness || 1.5) - 1.5) * 0.1 + (state.boxStem ? 0.05 : 0);
+                            volCm3 = (p.baseW * p.baseD * p.h * fillFactor) / 1000;
+                        }
+                    } catch (e) { /* ignore */ }
+                } else if (cur === 'body' && window._bodyModule) {
+                    try {
+                        const st = window._bodyModule.getState();
+                        const w = 380, d = 130;
+                        const h = (st.bezelTop || 5) + (st.bezelBottom || 8) + (st.bottomThickness || 2.5);
+                        const wt = st.wallThickness || 3.0;
+                        volCm3 = Math.max(0, (w * d * h - (w - wt*2) * (d - wt*2) * (h - 2)) / 1000);
+                    } catch (e) { /* ignore */ }
+                } else if (cur === 'layout') {
+                    showResult('<div>レイアウト Studio には材料コストは適用されません (CNC 切削はベンダーごとに料金が異なるため)。</div>');
+                    return;
+                }
+                if (volCm3 <= 0) {
+                    showResult('<div style="color:#ff9800;">⚠️ 体積を推定できませんでした</div>');
+                    return;
+                }
+                html += `<div style="margin-bottom:8px;">推定体積: <strong>${volCm3.toFixed(2)}</strong> cm³</div>`;
+                html += '<table style="width:100%; font-size:0.8rem;"><tr><th style="text-align:left;">材料</th><th>重量</th><th>コスト</th></tr>';
+                for (const [k, v] of Object.entries(PRICES)) {
+                    const w = volCm3 * v.density;
+                    const c = (w / 1000) * v.perKg;
+                    html += `<tr><td>${k.toUpperCase()}</td><td>${w.toFixed(1)} g</td><td>$${c.toFixed(2)}</td></tr>`;
+                }
+                html += '</table><div style="margin-top:8px; font-size:0.7rem; color:#888;">※ 概算。スライサーで実使用量を確認推奨。</div>';
+                showResult(html);
+            }
+            function showDiagnostic() {
+                const env = [];
+                env.push(`UA: ${navigator.userAgent.slice(0, 80)}`);
+                env.push(`Memory: ${navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'N/A'}`);
+                env.push(`Workers: ${typeof Worker !== 'undefined' ? 'OK' : 'NG'}`);
+                env.push(`WebAssembly: ${typeof WebAssembly !== 'undefined' ? 'OK' : 'NG'}`);
+                env.push(`IndexedDB: ${typeof indexedDB !== 'undefined' ? 'OK' : 'NG'}`);
+                env.push(`localStorage: ${(() => { try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return 'OK'; } catch(e){return 'NG';} })()}`);
+                env.push(`THREE: ${typeof THREE !== 'undefined' ? (THREE.REVISION || 'unknown') : 'NG'}`);
+                env.push(`FontEngine3D: ${typeof FontEngine3D !== 'undefined' ? 'OK' : 'NG'}`);
+                env.push(`MeshFixLib: ${(typeof MeshFixLib !== 'undefined') ? 'OK' : 'N/A (Worker内)'}`);
+                env.push(`Pyodide: ${typeof loadPyodide === 'function' || (typeof window !== 'undefined' && window.pyodide) ? 'OK' : 'N/A'}`);
+                let html = '<div style="font-weight:bold; margin-bottom:6px;">環境</div><ul style="font-size:0.78rem; line-height:1.4;">';
+                for (const e of env) html += `<li>${e}</li>`;
+                html += '</ul>';
+                html += `<div style="font-weight:bold; margin-top:10px; margin-bottom:6px;">エラーログ (${_errorLog.length} 件)</div>`;
+                if (_errorLog.length === 0) {
+                    html += '<div style="color:#69f0ae;">✅ エラーなし</div>';
+                } else {
+                    html += '<ul style="font-size:0.75rem; line-height:1.4;">';
+                    for (const e of _errorLog.slice(-10).reverse()) {
+                        const t = new Date(e.ts).toLocaleTimeString();
+                        html += `<li style="margin-bottom:4px; padding:4px 6px; background:rgba(255,82,82,0.08); border-left:2px solid #ff5252; border-radius:2px;"><span style="color:#888;">[${t}]</span> ${e.msg}${e.src ? `<br><span style="color:#888; font-size:0.7rem;">${e.src}:${e.line || '?'}</span>` : ''}</li>`;
+                    }
+                    html += '</ul>';
+                }
+                showResult(html);
+            }
+            function showHistory() {
+                let html = '<div style="font-weight:bold; margin-bottom:6px;">履歴一覧</div>';
+                try {
+                    if (typeof history !== 'undefined' && Array.isArray(history) && typeof historyIndex === 'number') {
+                        html += `<div>Keycap: <strong>${history.length}</strong> 世代 (現在 #${historyIndex + 1})</div>`;
+                    }
+                } catch (e) { /* ignore */ }
+                try {
+                    const lastExp = localStorage.getItem('kbs_last_export_at');
+                    if (lastExp) {
+                        const d = new Date(parseInt(lastExp, 10));
+                        html += `<div>最終出力: ${d.toLocaleString()}</div>`;
+                    }
+                } catch (e) { /* ignore */ }
+                html += '<div style="margin-top:10px; font-size:0.72rem; color:#888;">※ 詳細な世代スナップショット表示は Phase 11+ で実装予定。現状は Undo/Redo 世代カウントと最終出力時刻のみ。</div>';
+                showResult(html);
+            }
+            function openTools() {
+                const m = document.getElementById('tools-modal');
+                if (m) { m.style.display = 'flex'; document.getElementById('tools-result').style.display = 'none'; }
+            }
+            function closeTools() {
+                const m = document.getElementById('tools-modal');
+                if (m) m.style.display = 'none';
+            }
+            document.getElementById('qa-tools')?.addEventListener('click', openTools);
+            document.getElementById('btn-close-tools')?.addEventListener('click', closeTools);
+            document.getElementById('tools-modal')?.addEventListener('click', (e) => {
+                if (e.target.id === 'tools-modal') closeTools();
+            });
+            document.getElementById('tool-screenshot')?.addEventListener('click', takeScreenshot);
+            document.getElementById('tool-cost')?.addEventListener('click', showCostEstimate);
+            document.getElementById('tool-diagnostic')?.addEventListener('click', showDiagnostic);
+            document.getElementById('tool-history')?.addEventListener('click', showHistory);
+        })();
+    </script>
 
 </body>
 

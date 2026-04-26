@@ -530,3 +530,94 @@
     </div>
     <p style="font-size:0.65rem; color:#888; margin:4px 0 0 0;" data-i18n="body_cross_section_note">※ 表示専用機能です。STL/3MF 出力には影響しません。</p>
 </div>
+
+<!-- Phase 9: アシスト機能 -->
+<h3 id="sec-body-assist" class="body-section-header" data-i18n="body_h_assist">アシスト機能 (Phase 9)</h3>
+
+<!-- 1. Weight & material estimate -->
+<div class="control-group" style="border-top:1px solid #222; padding-top:8px;">
+    <label class="body-label" data-i18n="body_lbl_assist_material">材料 (Weight & Cost)</label>
+    <select id="body-assist-material" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.8rem; border-radius:3px;">
+        <option value="pla">PLA (1.24 g/cm³ - $25/kg)</option>
+        <option value="abs">ABS (1.04 g/cm³ - $28/kg)</option>
+        <option value="petg">PETG (1.27 g/cm³ - $28/kg)</option>
+        <option value="nylon">Nylon (1.13 g/cm³ - $60/kg)</option>
+        <option value="resin">Resin (1.10 g/cm³ - $70/kg)</option>
+    </select>
+    <button id="body-assist-weight-btn" class="btn-small" style="margin-top:4px; width:100%;" data-i18n="body_btn_assist_weight">重量・コスト推定</button>
+</div>
+
+<!-- 2. Screw post auto-placement -->
+<div class="control-group" style="margin-top:6px;">
+    <button id="body-assist-screwpost-btn" class="btn-small" style="width:100%;" data-i18n="body_btn_assist_screwpost">ネジ柱推奨位置を表示</button>
+</div>
+
+<!-- 3. Insert guide -->
+<div class="control-group" style="margin-top:6px;">
+    <label class="body-label" data-i18n="body_lbl_assist_insert">インサート (Heat-set)</label>
+    <select id="body-assist-insert" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.8rem; border-radius:3px;">
+        <option value="m2">M2</option>
+        <option value="m2_5">M2.5</option>
+        <option value="m3" selected>M3</option>
+    </select>
+    <button id="body-assist-insert-btn" class="btn-small" style="margin-top:4px; width:100%;" data-i18n="body_btn_assist_insert">推奨穴寸法を表示</button>
+</div>
+
+<!-- 4. Gasket compression simulator -->
+<div class="control-group" style="margin-top:6px;">
+    <label class="body-label" data-i18n="body_lbl_assist_gasket">ガスケット圧縮シミュレーター</label>
+    <div style="display:flex; gap:4px; margin-top:4px;">
+        <div style="flex:1;">
+            <label style="font-size:0.7rem; color:#aaa;" data-i18n="body_lbl_gasket_thick_mm">厚み(mm)</label>
+            <input type="number" id="body-assist-gasket-thickness" value="2.5" min="0.5" max="10" step="0.1" style="width:100%; background:#0d0d1a; color:#fff; border:1px solid #333; border-radius:3px; padding:3px; font-size:0.75rem;">
+        </div>
+        <div style="flex:1;">
+            <label style="font-size:0.7rem; color:#aaa;" data-i18n="body_lbl_gasket_hardness">硬度(ShoreA)</label>
+            <input type="number" id="body-assist-gasket-hardness" value="50" min="10" max="100" step="1" style="width:100%; background:#0d0d1a; color:#fff; border:1px solid #333; border-radius:3px; padding:3px; font-size:0.75rem;">
+        </div>
+        <div style="flex:1;">
+            <label style="font-size:0.7rem; color:#aaa;" data-i18n="body_lbl_gasket_compress">圧縮率(%)</label>
+            <input type="number" id="body-assist-gasket-compression" value="20" min="0" max="50" step="1" style="width:100%; background:#0d0d1a; color:#fff; border:1px solid #333; border-radius:3px; padding:3px; font-size:0.75rem;">
+        </div>
+    </div>
+    <button id="body-assist-gasket-btn" class="btn-small" style="margin-top:4px; width:100%;" data-i18n="body_btn_assist_gasket">推奨内部高さを計算</button>
+</div>
+
+<!-- 5. Acoustic tuning preset -->
+<div class="control-group" style="margin-top:6px;">
+    <label class="body-label" data-i18n="body_lbl_assist_acoustic">音響チューニング プリセット</label>
+    <select id="body-assist-acoustic" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; width:100%; font-size:0.8rem; border-radius:3px;">
+        <option value="hollow" data-i18n="body_opt_acoustic_hollow">Hollow (中空・響き)</option>
+        <option value="bass" data-i18n="body_opt_acoustic_bass">Bass (低音強調)</option>
+        <option value="firm" selected data-i18n="body_opt_acoustic_firm">Firm (硬質)</option>
+        <option value="silent" data-i18n="body_opt_acoustic_silent">Silent (静音)</option>
+        <option value="foam" data-i18n="body_opt_acoustic_foam">Foam-Heavy (フォーム充填)</option>
+    </select>
+    <button id="body-assist-acoustic-btn" class="btn-small" style="margin-top:4px; width:100%;" data-i18n="body_btn_assist_acoustic">プリセット適用</button>
+</div>
+
+<!-- 6. USB port template -->
+<div class="control-group" style="margin-top:6px;">
+    <label class="body-label" data-i18n="body_lbl_assist_usb">USBポートテンプレート</label>
+    <button id="body-assist-usb-btn" class="btn-small" style="width:100%;" data-i18n="body_btn_assist_usb">選択中ポート寸法を表示</button>
+</div>
+
+<!-- 7. Tilt angle verification -->
+<div class="control-group" style="margin-top:6px;">
+    <button id="body-assist-tilt-btn" class="btn-small" style="width:100%;" data-i18n="body_btn_assist_tilt">タイピング角度を検証</button>
+</div>
+
+<!-- 8. Variation generator -->
+<div class="control-group" style="margin-top:6px;">
+    <label class="body-label" data-i18n="body_lbl_assist_variation">バリエーション生成</label>
+    <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:3px; margin-top:4px;">
+        <button class="btn-small body-assist-var-btn" data-variation="low" data-i18n="body_btn_var_low">Low</button>
+        <button class="btn-small body-assist-var-btn" data-variation="standard" data-i18n="body_btn_var_standard">Std</button>
+        <button class="btn-small body-assist-var-btn" data-variation="high" data-i18n="body_btn_var_high">High</button>
+        <button class="btn-small body-assist-var-btn" data-variation="wedge" data-i18n="body_btn_var_wedge">Wedge</button>
+        <button class="btn-small body-assist-var-btn" data-variation="floating" data-i18n="body_btn_var_floating">Float</button>
+    </div>
+</div>
+
+<!-- Inline result panel -->
+<div id="body-assist-result" style="display:none; margin-top:8px; padding:8px 10px; background:rgba(0,229,255,0.06); border-left:3px solid #00e5ff; border-radius:3px; font-size:0.74rem; line-height:1.5; color:#e0f7fa; max-height:280px; overflow-y:auto;"></div>

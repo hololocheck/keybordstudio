@@ -84,7 +84,19 @@ const state = {
     // Layer system
     layers: [],
     activeLayerId: 1,
+    // Phase 8 additions
+    switchHoleType: 'mx',
+    snapAngles: true,
+    showMatrixIds: false,
 };
+
+// ── Phase 8 helpers ───────────────────────
+function getSwitchHoleSize() {
+    const t = state.switchHoleType || 'mx';
+    if (t === 'choc') return { w: 13.8, h: 13.8 };
+    if (t === 'alps') return { w: 15.5, h: 12.8 };
+    return { w: 14.0, h: 14.0 };
+}
 
 // ── Symbols ───────────────────────────────
 const symbols = [];
@@ -5639,6 +5651,41 @@ function loadUI(container) {
                 <button id="layout-cad-export-btn" style="width:100%; padding:6px 12px; background:#2a2a3e; border:1px solid #4fc3f7; color:#4fc3f7; border-radius:4px; cursor:pointer; font-size:0.8rem;">
                     CADエクスポート (DXF / SVG)
                 </button>
+                <button id="layout-qmk-export-btn" style="width:100%; margin-top:6px; padding:6px 12px; background:#2a2a3e; border:1px solid #81c784; color:#81c784; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                    QMK info.json 出力
+                </button>
+                <button id="layout-csv-dim-btn" style="width:100%; margin-top:6px; padding:6px 12px; background:#2a2a3e; border:1px solid #ffb74d; color:#ffb74d; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                    寸法表 (CSV)
+                </button>
+                <button id="layout-ergo-eval-btn" style="width:100%; margin-top:6px; padding:6px 12px; background:#2a2a3e; border:1px solid #ce93d8; color:#ce93d8; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                    エルゴ評価
+                </button>
+            </div>
+        </div>
+
+        <!-- PHASE 8: ADVANCED -->
+        <div class="section-block" id="sec-layout-advanced">
+            <div class="section-header">高度設定</div>
+            <div style="padding:5px;">
+                <div class="param-row" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                    <label style="color:#aaa; font-size:0.72rem; flex:1;">スイッチ穴タイプ</label>
+                    <select id="layout-switch-hole-type" style="flex:1; background:#0a0a1a; border:1px solid #3a3a4e; color:#e0f7fa; padding:4px; border-radius:3px; font-size:0.72rem;">
+                        <option value="mx">MX (14×14)</option>
+                        <option value="choc">Choc (13.8×13.8)</option>
+                        <option value="alps">Alps (15.5×12.8)</option>
+                    </select>
+                </div>
+                <button id="layout-mirror-sel-btn" style="width:100%; margin-top:6px; padding:6px 12px; background:#2a2a3e; border:1px solid #4fc3f7; color:#4fc3f7; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                    選択を左右反転
+                </button>
+                <label style="display:flex; align-items:center; gap:6px; margin-top:8px; color:#aaa; font-size:0.72rem; cursor:pointer;">
+                    <input type="checkbox" id="layout-snap-angles" checked>
+                    回転スナップ (5°)
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; margin-top:6px; color:#aaa; font-size:0.72rem; cursor:pointer;">
+                    <input type="checkbox" id="layout-show-matrix-ids">
+                    マトリクスID表示 (R{row}C{col})
+                </label>
             </div>
         </div>
 
@@ -5715,6 +5762,56 @@ function bindUI() {
     // CAD Export
     const exportBtnSidebar = document.getElementById('layout-cad-export-btn');
     if (exportBtnSidebar) exportBtnSidebar.addEventListener('click', openCadExportDialog);
+
+    // Phase 8: QMK info.json
+    const qmkBtn = document.getElementById('layout-qmk-export-btn');
+    if (qmkBtn) qmkBtn.addEventListener('click', exportQMKInfoJson);
+
+    // Phase 8: 寸法表 CSV
+    const csvBtn = document.getElementById('layout-csv-dim-btn');
+    if (csvBtn) csvBtn.addEventListener('click', exportDimensionsCSV);
+
+    // Phase 8: エルゴ評価
+    const ergoBtn = document.getElementById('layout-ergo-eval-btn');
+    if (ergoBtn) ergoBtn.addEventListener('click', evaluateErgonomics);
+
+    // Phase 8: スイッチ穴タイプ
+    const holeSel = document.getElementById('layout-switch-hole-type');
+    if (holeSel) {
+        holeSel.value = state.switchHoleType || 'mx';
+        holeSel.addEventListener('change', e => {
+            state.switchHoleType = e.target.value || 'mx';
+            const sz = getSwitchHoleSize();
+            console.log(`[layout] switch hole type=${state.switchHoleType} size=${sz.w}x${sz.h}mm`);
+            if (showToast) showToast(`スイッチ穴: ${state.switchHoleType} (${sz.w}×${sz.h}mm)`);
+            drawCanvas();
+        });
+    }
+
+    // Phase 8: ミラー
+    const mirrorBtn = document.getElementById('layout-mirror-sel-btn');
+    if (mirrorBtn) mirrorBtn.addEventListener('click', mirrorSelectedSymbols);
+
+    // Phase 8: 回転スナップ
+    const snapAng = document.getElementById('layout-snap-angles');
+    if (snapAng) {
+        snapAng.checked = !!state.snapAngles;
+        snapAng.addEventListener('change', e => {
+            state.snapAngles = !!e.target.checked;
+            if (showToast) showToast(`回転スナップ: ${state.snapAngles ? 'ON' : 'OFF'}`);
+        });
+    }
+
+    // Phase 8: マトリクスID表示
+    const matIds = document.getElementById('layout-show-matrix-ids');
+    if (matIds) {
+        matIds.checked = !!state.showMatrixIds;
+        matIds.addEventListener('change', e => {
+            state.showMatrixIds = !!e.target.checked;
+            if (showToast) showToast(`マトリクスID: ${state.showMatrixIds ? 'ON' : 'OFF'}`);
+            drawCanvas();
+        });
+    }
 
     // Phase 4-5: KLE Raw Data インポート
     const kleBtn = document.getElementById('layout-kle-import-btn');
@@ -6090,6 +6187,117 @@ function openLayoutBatchExportDialog() {
             popup.classList.add('show');
         });
     });
+}
+
+// ── Phase 8 feature implementations ────────
+function exportQMKInfoJson() {
+    const layouts = { LAYOUT: { layout: [] } };
+    const pitch = state.gridSize || PITCH;
+    symbols.forEach(s => {
+        if (s.type && s.type.startsWith('switch-')) {
+            const def = SYMBOL_DEFS[s.type];
+            const wU = def ? (def.boundW / pitch) : 1;
+            layouts.LAYOUT.layout.push({
+                matrix: [Math.floor(s.y / pitch / PX_PER_MM), Math.floor(s.x / pitch / PX_PER_MM)],
+                x: parseFloat((s.x / PX_PER_MM / pitch).toFixed(2)),
+                y: parseFloat((s.y / PX_PER_MM / pitch).toFixed(2)),
+                w: wU,
+            });
+        }
+    });
+    const json = {
+        manufacturer: 'KeybordStudio',
+        keyboard_name: 'custom_layout',
+        maintainer: 'user',
+        usb: { vid: '0xFEED', pid: '0x0000', device_version: '0.0.1' },
+        matrix_pins: { rows: [], cols: [] },
+        diode_direction: 'COL2ROW',
+        layouts,
+    };
+    try {
+        const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+        if (typeof saveAs === 'function') {
+            saveAs(blob, 'info.json');
+            if (showToast) showToast(`QMK info.json 出力 (${layouts.LAYOUT.layout.length} keys)`);
+        } else if (showToast) {
+            showToast('saveAs 不可');
+        }
+    } catch (err) {
+        console.error('[layout] QMK export error:', err);
+        if (showToast) showToast('QMK 出力失敗: ' + (err.message || err));
+    }
+}
+
+function exportDimensionsCSV() {
+    const rows = ['id,type,x_mm,y_mm,rotation'];
+    symbols.forEach(s => {
+        const xMm = (s.x / PX_PER_MM).toFixed(3);
+        const yMm = (s.y / PX_PER_MM).toFixed(3);
+        const rot = (typeof s.rotation === 'number' ? s.rotation : 0).toFixed(2);
+        rows.push(`${s.id},${s.type || ''},${xMm},${yMm},${rot}`);
+    });
+    try {
+        const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+        if (typeof saveAs === 'function') {
+            saveAs(blob, 'layout-dimensions.csv');
+            if (showToast) showToast(`寸法表 CSV 出力 (${symbols.length} 行)`);
+        } else if (showToast) {
+            showToast('saveAs 不可');
+        }
+    } catch (err) {
+        console.error('[layout] CSV export error:', err);
+        if (showToast) showToast('CSV 出力失敗: ' + (err.message || err));
+    }
+}
+
+function evaluateErgonomics() {
+    if (!symbols.length) {
+        if (showToast) showToast('シンボルがありません');
+        return;
+    }
+    const xs = symbols.map(s => s.x);
+    const ys = symbols.map(s => s.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const widthMm = (maxX - minX) / PX_PER_MM;
+    const heightMm = (maxY - minY) / PX_PER_MM;
+    const keyCount = symbols.filter(s => s.type && s.type.startsWith('switch-')).length;
+    const pitch = state.gridSize || PITCH;
+    // Home row heuristic: rows 3-4 (0-indexed) from top of layout
+    const homeRowYStart = minY + 2 * pitch * PX_PER_MM;
+    const homeRowYEnd = minY + 4 * pitch * PX_PER_MM;
+    const homeCenter = (homeRowYStart + homeRowYEnd) / 2;
+    let totalDist = 0, n = 0;
+    symbols.forEach(s => {
+        if (s.type && s.type.startsWith('switch-')) {
+            totalDist += Math.abs(s.y - homeCenter) / PX_PER_MM;
+            n++;
+        }
+    });
+    const avgDist = n > 0 ? (totalDist / n).toFixed(2) : '0.00';
+    const msg = `エルゴ評価: ${widthMm.toFixed(1)}×${heightMm.toFixed(1)}mm / ${keyCount} keys / ホーム行平均距離 ${avgDist}mm`;
+    console.log('[layout] ' + msg);
+    if (showToast) showToast(msg);
+    else alert(msg);
+}
+
+function mirrorSelectedSymbols() {
+    if (!selectedIds || selectedIds.size === 0) {
+        if (showToast) showToast('シンボルを選択してください');
+        return;
+    }
+    const sel = symbols.filter(s => selectedIds.has(s.id));
+    if (sel.length === 0) return;
+    if (typeof pushUndo === 'function') pushUndo();
+    const minX = Math.min(...sel.map(s => s.x));
+    const maxX = Math.max(...sel.map(s => s.x));
+    const cx = (minX + maxX) / 2;
+    sel.forEach(s => {
+        s.x = 2 * cx - s.x;
+        if (typeof s.rotation === 'number') s.rotation = -s.rotation;
+    });
+    drawCanvas();
+    if (showToast) showToast(`${sel.length} シンボルを左右反転`);
 }
 
 // ── Export Module ──────────────────────────
