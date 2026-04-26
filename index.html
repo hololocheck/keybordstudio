@@ -12279,10 +12279,21 @@ result
             if (!head || !list || !hiddenSelect) return;
             function populate() {
                 const fk = getCurrentFontKey();
+                let _hoverPreviewTimer = null;
                 list.innerHTML = ''; Array.from(hiddenSelect.options).forEach(opt => {
                     if (!loadedFontData[opt.value]) return;
                     const div = document.createElement('div'); div.className = 'custom-option'; div.textContent = opt.text; if (opt.value === state[fk]) div.classList.add('selected');
-                    div.addEventListener('mouseenter', () => { state[fk] = opt.value; requestUpdate(); });
+                    div.addEventListener('mouseenter', () => {
+                        if (_hoverPreviewTimer) clearTimeout(_hoverPreviewTimer);
+                        _hoverPreviewTimer = setTimeout(() => {
+                            _hoverPreviewTimer = null;
+                            state[fk] = opt.value;
+                            requestUpdate();
+                        }, 350);
+                    });
+                    div.addEventListener('mouseleave', () => {
+                        if (_hoverPreviewTimer) { clearTimeout(_hoverPreviewTimer); _hoverPreviewTimer = null; }
+                    });
                     div.addEventListener('click', () => {
                         const fk2 = getCurrentFontKey();
                         committedFont = opt.value;
@@ -17955,9 +17966,10 @@ ${componentsXml}      </components>
         }
 
         let debounceTimeout = null;
-        function requestUpdate() {
+        function requestUpdate(delay) {
+            if (typeof delay !== 'number') delay = 100;
             if (debounceTimeout) clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(updateModel, 100);
+            debounceTimeout = setTimeout(updateModel, delay);
         }
 
         function cleanupGeometry(geometry) {
@@ -22139,11 +22151,11 @@ ${mesh.triangles.join('\n')}
         });
 
         const txtC = document.getElementById('text-content');
-        if (txtC) txtC.addEventListener('input', e => { state.text = e.target.value; requestUpdate(); });
+        if (txtC) txtC.addEventListener('input', e => { state.text = e.target.value; requestUpdate(300); });
         const txt2C = document.getElementById('text2-content');
-        if (txt2C) txt2C.addEventListener('input', e => { state.text2 = e.target.value; requestUpdate(); });
+        if (txt2C) txt2C.addEventListener('input', e => { state.text2 = e.target.value; requestUpdate(300); });
         const sideT = document.getElementById('side-text');
-        if (sideT) sideT.addEventListener('input', e => { state.sideText = e.target.value; requestUpdate(); });
+        if (sideT) sideT.addEventListener('input', e => { state.sideText = e.target.value; requestUpdate(300); });
         const colB = document.getElementById('col-body');
         if (colB) colB.addEventListener('input', e => {
             state.colBody = e.target.value;

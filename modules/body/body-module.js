@@ -945,12 +945,20 @@ let currentBodyTextTarget = 'topText';
 
 // requestAnimationFrame ベースの updateModel デバウンス
 let _bodyUpdateRAF = null;
+let _bodyUpdateTimer = null;
 function requestBodyUpdate() {
     if (_bodyUpdateRAF) return;
     _bodyUpdateRAF = requestAnimationFrame(() => {
         _bodyUpdateRAF = null;
         updateModel();
     });
+}
+// テキスト入力など、重いパイプラインを走らせたくない場面用の遅延デバウンス
+function requestBodyUpdateDebounced(delay) {
+    if (typeof delay !== 'number') delay = 300;
+    if (_bodyUpdateTimer) clearTimeout(_bodyUpdateTimer);
+    if (_bodyUpdateRAF) { cancelAnimationFrame(_bodyUpdateRAF); _bodyUpdateRAF = null; }
+    _bodyUpdateTimer = setTimeout(() => { _bodyUpdateTimer = null; updateModel(); }, delay);
 }
 
 // テキストパネル切替
@@ -2708,7 +2716,7 @@ function bindUI() {
         if (!el) return;
         el.addEventListener('input', () => {
             state[prop] = el.value;
-            requestBodyUpdate();
+            requestBodyUpdateDebounced(300);
         });
         el.addEventListener('change', () => bodyCommitHistory());
     });

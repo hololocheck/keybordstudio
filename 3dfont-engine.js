@@ -2061,8 +2061,50 @@ var FontEngine3D = (() => {
             const char = String.fromCodePoint(charCode);
             const advanceWidth = hmtx[glyphId] ? hmtx[glyphId].advanceWidth : 0;
 
-            let commandStr = '';
+            // CFF/CFF2 は executeCharString が重く、フォント全グリフ（数千個）を
+            // パース時に展開すると OTF 読み込みで UI が数秒凍結する。
+            // → CFF 系は実際に glyph.o が参照された瞬間に評価する遅延ゲッターを用いる。
+            // TrueType は contour 情報が既にパース済みで安価なので従来通り即時評価。
+            if (!isTrueType && cffData && glyphId < cffData.charStringsIndex.data.length) {
+                const _charString = cffData.charStringsIndex.data[glyphId];
+                let _fdIdx = 0;
+                if (cffData.isCID && cffData.fdSelect) {
+                    _fdIdx = cffData.fdSelect[glyphId] || 0;
+                }
+                const _localSubrs = cffData.localSubrIndices[_fdIdx];
+                const _dwx = cffData.isCFF2 ? 0 : (cffData.defaultWidthX[_fdIdx] || 0);
+                const _nwx = cffData.isCFF2 ? 0 : (cffData.nominalWidthX[_fdIdx] || 0);
+                const _numR = cffData.numRegions || 0;
+                const _globSubr = cffData.globalSubrIndex;
 
+                const lazyGlyph = { ha: advanceWidth };
+                Object.defineProperty(lazyGlyph, 'o', {
+                    configurable: true,
+                    enumerable: true,
+                    get() {
+                        let path = '';
+                        try {
+                            const result = executeCharString(_charString, _globSubr, _localSubrs, _dwx, _nwx, _numR);
+                            path = cffPathToCommands(result.path);
+                        } catch (e) {
+                            path = '';
+                        }
+                        Object.defineProperty(this, 'o', {
+                            value: path,
+                            writable: true,
+                            enumerable: true,
+                            configurable: true
+                        });
+                        return path;
+                    }
+                });
+                glyphs[char] = lazyGlyph;
+                convertedCount++;
+                continue;
+            }
+
+            // TrueType eager path
+            let commandStr = '';
             try {
                 if (isTrueType) {
                     const glyph = glyphOutlines[glyphId];
@@ -2074,33 +2116,10 @@ var FontEngine3D = (() => {
                         }
                         commandStr = parts.join(' ');
                     }
-                } else {
-                    // CFF
-                    if (glyphId < cffData.charStringsIndex.data.length) {
-                        const charString = cffData.charStringsIndex.data[glyphId];
-                        let fdIdx = 0;
-                        if (cffData.isCID && cffData.fdSelect) {
-                            fdIdx = cffData.fdSelect[glyphId] || 0;
-                        }
-                        const localSubrs = cffData.localSubrIndices[fdIdx];
-                        const dwx = cffData.defaultWidthX[fdIdx] || 0;
-                        const nwx = cffData.nominalWidthX[fdIdx] || 0;
-
-                        const result = executeCharString(
-                            charString,
-                            cffData.globalSubrIndex,
-                            localSubrs,
-                            cffData.isCFF2 ? 0 : dwx,
-                            cffData.isCFF2 ? 0 : nwx,
-                            cffData.numRegions || 0
-                        );
-                        commandStr = cffPathToCommands(result.path);
-                    }
                 }
                 convertedCount++;
             } catch (e) {
                 errorCount++;
-                // Skip problematic glyphs
                 commandStr = '';
             }
 
@@ -2263,6 +2282,11 @@ ${paths}</svg>`;
     //   const geometry = new THREE.ExtrudeGeometry(shapes, { depth: 15, curveSegments: 48 });
     // =========================================================================
 
+    // Per-glyph subpath cache: WeakMap<glyphObj, Map<"scale|divisions|rev", computedSubpaths>>
+    // computedSubpaths は offsetX=0・THREE非依存の純データ（{outers: [{pts, holes:[{pts}]}]}）。
+    // キャッシュヒット時はテッセレーションをスキップし、offsetX を加算しながら THREE.Shape を組むだけで済む。
+    const _glyphSubpathCache = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
+
     function createTextShapes(THREE, typefaceJSON, text, options) {
         options = options || {};
         const size = options.size || 80;
@@ -2285,8 +2309,11 @@ ${paths}</svg>`;
             }
 
             if (glyph.o) {
-                const shapes = _buildShapesFromGlyph(THREE, glyph.o, scale, offsetX, divisions, reverseWinding);
-                allShapes.push(...shapes);
+                const computed = _getCachedGlyphSubpaths(glyph, scale, divisions, reverseWinding);
+                if (computed && computed.outers.length > 0) {
+                    const shapes = _buildShapesAtOffset(THREE, computed, offsetX);
+                    allShapes.push(...shapes);
+                }
             }
 
             offsetX += (glyph.ha || 0) * scale;
@@ -2302,123 +2329,35 @@ ${paths}</svg>`;
         return allShapes;
     }
 
-    function _buildShapesFromGlyph(THREE, pathStr, scale, offsetX, divisions, reverseWinding) {
-        const tokens = pathStr.split(' ');
-        const subPaths = [];
-        let current = null;
-        let i = 0;
-
-        while (i < tokens.length) {
-            const cmd = tokens[i];
-            switch (cmd) {
-                case 'm': {
-                    current = [];
-                    subPaths.push(current);
-                    const x = parseFloat(tokens[i+1]) * scale + offsetX;
-                    const y = parseFloat(tokens[i+2]) * scale;
-                    current.push({ type: 'move', x, y });
-                    i += 3;
-                    break;
-                }
-                case 'l': {
-                    const x = parseFloat(tokens[i+1]) * scale + offsetX;
-                    const y = parseFloat(tokens[i+2]) * scale;
-                    if (current) current.push({ type: 'line', x, y });
-                    i += 3;
-                    break;
-                }
-                case 'q': {
-                    const cpx = parseFloat(tokens[i+1]) * scale + offsetX;
-                    const cpy = parseFloat(tokens[i+2]) * scale;
-                    const x   = parseFloat(tokens[i+3]) * scale + offsetX;
-                    const y   = parseFloat(tokens[i+4]) * scale;
-                    if (current) current.push({ type: 'quad', cpx, cpy, x, y });
-                    i += 5;
-                    break;
-                }
-                case 'b': {
-                    const cp1x = parseFloat(tokens[i+1]) * scale + offsetX;
-                    const cp1y = parseFloat(tokens[i+2]) * scale;
-                    const cp2x = parseFloat(tokens[i+3]) * scale + offsetX;
-                    const cp2y = parseFloat(tokens[i+4]) * scale;
-                    const x    = parseFloat(tokens[i+5]) * scale + offsetX;
-                    const y    = parseFloat(tokens[i+6]) * scale;
-                    if (current) current.push({ type: 'cubic', cp1x, cp1y, cp2x, cp2y, x, y });
-                    i += 7;
-                    break;
-                }
-                default:
-                    i++;
+    function _getCachedGlyphSubpaths(glyph, scale, divisions, reverseWinding) {
+        const key = scale + '|' + divisions + '|' + (reverseWinding ? 1 : 0);
+        if (_glyphSubpathCache) {
+            let perGlyph = _glyphSubpathCache.get(glyph);
+            if (perGlyph) {
+                const hit = perGlyph.get(key);
+                if (hit) return hit;
+            } else {
+                perGlyph = new Map();
+                _glyphSubpathCache.set(glyph, perGlyph);
             }
+            const computed = _computeGlyphSubpaths(glyph.o, scale, divisions, reverseWinding);
+            perGlyph.set(key, computed);
+            return computed;
         }
+        return _computeGlyphSubpaths(glyph.o, scale, divisions, reverseWinding);
+    }
 
-        if (subPaths.length === 0) return [];
-
-        function tessellate(sp, divs) {
-            const pts = [];
-            if (sp.length === 0) return pts;
-            let cx = sp[0].x, cy = sp[0].y;
-            pts.push({ x: cx, y: cy });
-
-            for (let j = 1; j < sp.length; j++) {
-                const cmd = sp[j];
-                switch (cmd.type) {
-                    case 'line':
-                        pts.push({ x: cmd.x, y: cmd.y });
-                        cx = cmd.x; cy = cmd.y;
-                        break;
-                    case 'quad':
-                        for (let t = 1; t <= divs; t++) {
-                            const u = t / divs, inv = 1 - u;
-                            pts.push({
-                                x: inv*inv*cx + 2*inv*u*cmd.cpx + u*u*cmd.x,
-                                y: inv*inv*cy + 2*inv*u*cmd.cpy + u*u*cmd.y
-                            });
-                        }
-                        cx = cmd.x; cy = cmd.y;
-                        break;
-                    case 'cubic':
-                        for (let t = 1; t <= divs; t++) {
-                            const u = t / divs, inv = 1 - u;
-                            pts.push({
-                                x: inv*inv*inv*cx + 3*inv*inv*u*cmd.cp1x + 3*inv*u*u*cmd.cp2x + u*u*u*cmd.x,
-                                y: inv*inv*inv*cy + 3*inv*inv*u*cmd.cp1y + 3*inv*u*u*cmd.cp2y + u*u*u*cmd.y
-                            });
-                        }
-                        cx = cmd.x; cy = cmd.y;
-                        break;
-                }
-            }
-            return pts;
-        }
-
-        function signedArea(pts) {
-            let area = 0;
-            for (let j = 0, n = pts.length; j < n; j++) {
-                const p1 = pts[j], p2 = pts[(j + 1) % n];
-                area += (p1.x * p2.y - p2.x * p1.y);
-            }
-            return area / 2;
-        }
-
-        function isPointInPolygon(pt, polygon) {
-            let inside = false;
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                const xi = polygon[i].x, yi = polygon[i].y;
-                const xj = polygon[j].x, yj = polygon[j].y;
-                if (((yi > pt.y) !== (yj > pt.y)) &&
-                    (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi)) {
-                    inside = !inside;
-                }
-            }
-            return inside;
-        }
+    // 純データ（THREE非依存・offsetX=0）の subpath 計算。
+    // 戻り値: { outers: [ { pts: [{x,y}...], holes: [ { pts: [{x,y}...] } ... ] } ... ] }
+    function _computeGlyphSubpaths(pathStr, scale, divisions, reverseWinding) {
+        const subPaths = _parsePathString(pathStr, scale);
+        if (subPaths.length === 0) return { outers: [] };
 
         const areaDiv = Math.max(divisions, 48);
         const subPathData = subPaths.map(sp => {
-            const pts = tessellate(sp, areaDiv);
-            const area = signedArea(pts);
-            return { sp, pts, area };
+            const pts = _tessellate(sp, areaDiv);
+            const area = _signedArea(pts);
+            return { pts, area };
         });
 
         let largestIdx = 0, largestArea = 0;
@@ -2435,54 +2374,161 @@ ${paths}</svg>`;
             if (reverseWinding) d.isOuter = !d.isOuter;
         }
 
-        // Build THREE.Shape/Path from pre-tessellated points (smooth polylines).
-        // This bypasses Three.js internal curve tessellation which can produce
-        // inconsistent results with ExtrudeGeometry for certain font glyphs.
-        function buildThreePathFromPoints(pts, isShape) {
-            const path = isShape ? new THREE.Shape() : new THREE.Path();
-            if (pts.length === 0) return path;
-            path.moveTo(pts[0].x, pts[0].y);
-            for (let j = 1; j < pts.length; j++) {
-                path.lineTo(pts[j].x, pts[j].y);
-            }
-            return path;
-        }
-
         const outers = [];
         const holes = [];
-
         for (const d of subPathData) {
-            if (d.isOuter) {
-                outers.push({ data: d, shape: buildThreePathFromPoints(d.pts, true), holes: [] });
-            } else {
-                holes.push(d);
-            }
+            if (d.isOuter) outers.push({ pts: d.pts, area: d.area, holes: [] });
+            else holes.push(d);
         }
 
         for (const hole of holes) {
-            const holePath = buildThreePathFromPoints(hole.pts, false);
             if (hole.pts.length === 0) continue;
             const testPt = hole.pts[0];
             let bestOuter = null, bestArea = Infinity;
-
             for (const outer of outers) {
-                if (isPointInPolygon(testPt, outer.data.pts)) {
-                    const absArea = Math.abs(outer.data.area);
-                    if (absArea < bestArea) {
-                        bestArea = absArea;
-                        bestOuter = outer;
-                    }
+                if (_isPointInPolygon(testPt, outer.pts)) {
+                    const absArea = Math.abs(outer.area);
+                    if (absArea < bestArea) { bestArea = absArea; bestOuter = outer; }
                 }
             }
-
-            if (bestOuter) {
-                bestOuter.shape.holes.push(holePath);
-            } else if (outers.length > 0) {
-                outers[0].shape.holes.push(holePath);
-            }
+            if (bestOuter) bestOuter.holes.push({ pts: hole.pts });
+            else if (outers.length > 0) outers[0].holes.push({ pts: hole.pts });
         }
 
-        return outers.map(o => o.shape);
+        return { outers };
+    }
+
+    // 計算済み subpath から、指定 offsetX を加算しつつ THREE.Shape の配列を組み立てる。
+    // テッセレーションは行わないので軽量。
+    function _buildShapesAtOffset(THREE, computed, offsetX) {
+        const result = [];
+        for (const outer of computed.outers) {
+            const shape = new THREE.Shape();
+            const pts = outer.pts;
+            if (pts.length === 0) continue;
+            shape.moveTo(pts[0].x + offsetX, pts[0].y);
+            for (let j = 1; j < pts.length; j++) shape.lineTo(pts[j].x + offsetX, pts[j].y);
+            for (const hole of outer.holes) {
+                const path = new THREE.Path();
+                const hp = hole.pts;
+                if (hp.length === 0) continue;
+                path.moveTo(hp[0].x + offsetX, hp[0].y);
+                for (let j = 1; j < hp.length; j++) path.lineTo(hp[j].x + offsetX, hp[j].y);
+                shape.holes.push(path);
+            }
+            result.push(shape);
+        }
+        return result;
+    }
+
+    function _parsePathString(pathStr, scale) {
+        const tokens = pathStr.split(' ');
+        const subPaths = [];
+        let current = null;
+        let i = 0;
+        while (i < tokens.length) {
+            const cmd = tokens[i];
+            switch (cmd) {
+                case 'm': {
+                    current = [];
+                    subPaths.push(current);
+                    const x = parseFloat(tokens[i+1]) * scale;
+                    const y = parseFloat(tokens[i+2]) * scale;
+                    current.push({ type: 'move', x, y });
+                    i += 3;
+                    break;
+                }
+                case 'l': {
+                    const x = parseFloat(tokens[i+1]) * scale;
+                    const y = parseFloat(tokens[i+2]) * scale;
+                    if (current) current.push({ type: 'line', x, y });
+                    i += 3;
+                    break;
+                }
+                case 'q': {
+                    const cpx = parseFloat(tokens[i+1]) * scale;
+                    const cpy = parseFloat(tokens[i+2]) * scale;
+                    const x   = parseFloat(tokens[i+3]) * scale;
+                    const y   = parseFloat(tokens[i+4]) * scale;
+                    if (current) current.push({ type: 'quad', cpx, cpy, x, y });
+                    i += 5;
+                    break;
+                }
+                case 'b': {
+                    const cp1x = parseFloat(tokens[i+1]) * scale;
+                    const cp1y = parseFloat(tokens[i+2]) * scale;
+                    const cp2x = parseFloat(tokens[i+3]) * scale;
+                    const cp2y = parseFloat(tokens[i+4]) * scale;
+                    const x    = parseFloat(tokens[i+5]) * scale;
+                    const y    = parseFloat(tokens[i+6]) * scale;
+                    if (current) current.push({ type: 'cubic', cp1x, cp1y, cp2x, cp2y, x, y });
+                    i += 7;
+                    break;
+                }
+                default:
+                    i++;
+            }
+        }
+        return subPaths;
+    }
+
+    function _tessellate(sp, divs) {
+        const pts = [];
+        if (sp.length === 0) return pts;
+        let cx = sp[0].x, cy = sp[0].y;
+        pts.push({ x: cx, y: cy });
+        for (let j = 1; j < sp.length; j++) {
+            const cmd = sp[j];
+            switch (cmd.type) {
+                case 'line':
+                    pts.push({ x: cmd.x, y: cmd.y });
+                    cx = cmd.x; cy = cmd.y;
+                    break;
+                case 'quad':
+                    for (let t = 1; t <= divs; t++) {
+                        const u = t / divs, inv = 1 - u;
+                        pts.push({
+                            x: inv*inv*cx + 2*inv*u*cmd.cpx + u*u*cmd.x,
+                            y: inv*inv*cy + 2*inv*u*cmd.cpy + u*u*cmd.y
+                        });
+                    }
+                    cx = cmd.x; cy = cmd.y;
+                    break;
+                case 'cubic':
+                    for (let t = 1; t <= divs; t++) {
+                        const u = t / divs, inv = 1 - u;
+                        pts.push({
+                            x: inv*inv*inv*cx + 3*inv*inv*u*cmd.cp1x + 3*inv*u*u*cmd.cp2x + u*u*u*cmd.x,
+                            y: inv*inv*inv*cy + 3*inv*inv*u*cmd.cp1y + 3*inv*u*u*cmd.cp2y + u*u*u*cmd.y
+                        });
+                    }
+                    cx = cmd.x; cy = cmd.y;
+                    break;
+            }
+        }
+        return pts;
+    }
+
+    function _signedArea(pts) {
+        let area = 0;
+        for (let j = 0, n = pts.length; j < n; j++) {
+            const p1 = pts[j], p2 = pts[(j + 1) % n];
+            area += (p1.x * p2.y - p2.x * p1.y);
+        }
+        return area / 2;
+    }
+
+    function _isPointInPolygon(pt, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].x, yi = polygon[i].y;
+            const xj = polygon[j].x, yj = polygon[j].y;
+            if (((yi > pt.y) !== (yj > pt.y)) &&
+                (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi)) {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     // Public API
