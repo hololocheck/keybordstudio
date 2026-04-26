@@ -53,13 +53,8 @@ export const keycapJa = {
     // SVG Settings
     h_svg: "SVGアイコン設定", btn_upload_svg: "SVG読込", btn_svg_manager: "SVGマネージャーを開く", cat_custom: "カスタム", lbl_visible: "表示",
 
-    // 制作フロー誘導 (Phase 6-1)
-    wf_step_layout: "レイアウト",
-    wf_step_body: "ボディ",
-    wf_step_keycap: "キーキャップ",
-    wf_step_export: "出力",
-    qa_save: "クイック保存", qa_export: "出力", qa_preflight: "製造前チェック",
-    lbl_advanced_mode: "詳細モード",
+    // (Phase 11 cleanup: workflow_guide / advanced_mode / qa_* keys removed
+    //  — UI 要素は 10ff1e2 で削除)
 
     // 断面ビュー
     h_cross_section: "断面ビュー",
@@ -428,12 +423,6 @@ export const keycapJa = {
     btn_profile_compare: "プロファイル比較", btn_stem_strength: "ステム強度チェック", btn_clearance_check: "押下クリアランス検査",
     lbl_row_batch: "行別一括生成",
     btn_theme_save: "現在の設定をテーマ保存", btn_theme_load: "テーマ一覧",
-    lbl_safe_area: "トップ面安全領域を表示", btn_print_sheet: "実寸チェックシート (SVG)",
-
-    // Phase 10+ 共通ツール
-    tools_title: "ツール",
-    tool_screenshot: "📷 スクリーンショット (PNG)",
-    tool_cost: "💰 コスト見積もり",
-    tool_diagnostic: "🔧 エラー診断",
-    tool_history: "📜 履歴一覧"
+    lbl_safe_area: "トップ面安全領域を表示", btn_print_sheet: "実寸チェックシート (SVG)"
+    // (Phase 11 cleanup: tools_* / tool_* キー削除 — Quick Action Bar 撤去)
 };

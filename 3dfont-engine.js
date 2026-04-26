@@ -833,6 +833,78 @@ var FontEngine3D = (() => {
     // =========================================================================
     // 'loca' table - Glyph locations (TrueType)
     // =========================================================================
+    // ==========================================================================
+    // Phase 11: HarfBuzz WASM 統合 (ミニマム)
+    // ==========================================================================
+    // 標準では使わず (FontEngine3D の単純レイアウトで描画)、ユーザーが
+    // window._harfbuzzInstance に harfbuzzjs インスタンスをセットしたら
+    // それを使う。CDN からの読み込み手順は README に記載。
+    //
+    // shapeText(typefaceJSON, text, fontBuffer): 戻り値は
+    //   [{ glyphId, x_advance, y_offset, ... }, ...]
+    // という HarfBuzz 標準のシェイピング結果配列。
+    //
+    // 「合字 (fi → ﬁ) / アラビア語 (右→左、コンテキスト依存) / インド系
+    // 結合文字 / CJK 縦書き」など FontEngine3D 単独では正確に処理できない
+    // ケースで、HarfBuzz が利用可能ならその結果を優先する。利用不可なら
+    // FontEngine3D の simple layout に fallback する。
+    function shapeText(typefaceJSON, text, fontBuffer) {
+        if (typeof window === 'undefined' || !window._harfbuzzInstance) {
+            return null; // HarfBuzz 未利用 → caller は fallback すべき
+        }
+        try {
+            const hb = window._harfbuzzInstance;
+            const blob = hb.createBlob(fontBuffer);
+            const face = hb.createFace(blob, 0);
+            const font = hb.createFont(face);
+            const buffer = hb.createBuffer();
+            buffer.addText(text);
+            buffer.guessSegmentProperties();
+            hb.shape(font, buffer);
+            const result = buffer.json();
+            buffer.destroy();
+            font.destroy();
+            face.destroy();
+            blob.destroy();
+            return result;
+        } catch (e) {
+            console.warn('HarfBuzz shaping failed, falling back:', e);
+            return null;
+        }
+    }
+
+    // Phase 11: 'fvar' table — Variable Font axis info (簡易版)
+    // 戻り値: [{ tag, min, default, max }, ...]
+    function parseFvarAxes(reader, table) {
+        if (!table) return [];
+        try {
+            reader.seek(table.offset);
+            reader.skip(2); // majorVersion
+            reader.skip(2); // minorVersion
+            const axesOffset = reader.readUint16();
+            reader.skip(2); // reserved
+            const axisCount = reader.readUint16();
+            const axisSize = reader.readUint16();
+            reader.skip(2); reader.skip(2); // instanceCount + instanceSize
+            const axes = [];
+            for (let i = 0; i < axisCount; i++) {
+                reader.seek(table.offset + axesOffset + i * axisSize);
+                const a = String.fromCharCode(reader.readUint8());
+                const b = String.fromCharCode(reader.readUint8());
+                const c = String.fromCharCode(reader.readUint8());
+                const d = String.fromCharCode(reader.readUint8());
+                const tag = a + b + c + d;
+                const min = reader.readInt32() / 65536;
+                const def = reader.readInt32() / 65536;
+                const max = reader.readInt32() / 65536;
+                axes.push({ tag, min, default: def, max });
+            }
+            return axes;
+        } catch (e) {
+            return [];
+        }
+    }
+
     function parseLoca(reader, table, numGlyphs, indexToLocFormat) {
         reader.seek(table.offset);
         const offsets = [];
@@ -2199,10 +2271,8 @@ var FontEngine3D = (() => {
                 errorGlyphs: errorCount,
                 totalMapped: charCodes.length,
                 type: formatStr,
-                // Phase 10-B3: 可変フォント axes 情報のスタブ。
-                // 現状 fvar テーブルはパースしておらず、CFF2 はデフォルトインスタンスを使う。
-                // 将来 fvar をサポートしたら、ここに [{ tag, min, max, default }, ...] を入れる。
-                variableAxes: []
+                // Phase 11: fvar テーブル軸情報を実際にパース
+                variableAxes: parseFvarAxes(reader, tables['fvar'])
             }
         };
 
@@ -2800,7 +2870,8 @@ ${paths}</svg>`;
 
     // Public API
     return { parse, createTextShapes, glyphToSVGPath, generateSVG,
-             diagnose, layoutMultiline, cacheStats, _cleanupOutline };
+             diagnose, layoutMultiline, cacheStats, _cleanupOutline,
+             shapeText };
 
 })();
 

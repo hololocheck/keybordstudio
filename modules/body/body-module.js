@@ -2615,6 +2615,53 @@ const VARIATION_PRESETS = {
     wedge:    { profileType: 'high', tiltAngle: 7, bezelTop: 5, bezelBottom: 12 },
     floating: { profileType: 'low',  bezelTop: 2, bezelBottom: 4, wallThickness: 2 }
 };
+
+// Phase 11: 分割ケース設計 (ベッドサイズチェック)
+// 主要 3D プリンタの造形サイズを参照し、現在のケースが収まるか判定する。
+// 収まらない場合は、推奨される分割数 (例: 左右 / 4分割) を提示する。
+const PRINTER_BED_SIZES = Object.freeze({
+    'bambu-x1':       { name: 'Bambu Lab X1/P1',     w: 256, d: 256, h: 256 },
+    'bambu-a1':       { name: 'Bambu Lab A1',        w: 256, d: 256, h: 256 },
+    'bambu-a1m':      { name: 'Bambu Lab A1 mini',   w: 180, d: 180, h: 180 },
+    'prusa-mk4':      { name: 'Prusa MK4',           w: 250, d: 210, h: 220 },
+    'prusa-xl':       { name: 'Prusa XL',            w: 360, d: 360, h: 360 },
+    'creality-k1':    { name: 'Creality K1',         w: 220, d: 220, h: 250 },
+    'creality-k2':    { name: 'Creality K2 Plus',    w: 350, d: 350, h: 350 },
+    'voron-2.4-300':  { name: 'Voron 2.4 (300)',     w: 300, d: 300, h: 300 },
+    'voron-2.4-350':  { name: 'Voron 2.4 (350)',     w: 350, d: 350, h: 350 }
+});
+
+function checkSplitCase(bedKey) {
+    const bed = PRINTER_BED_SIZES[bedKey] || PRINTER_BED_SIZES['bambu-x1'];
+    // 現在のレイアウトから推定外寸を計算
+    const layout = state.layout || '60';
+    const layoutW = { '60': 290, '65': 320, '75': 340, 'tkl': 360, 'full': 440, '40': 240, 'alice': 320, 'macro': 60, '1800': 410 }[layout] || 290;
+    const layoutD = 130; // 概算 (5 row)
+    const totalW = layoutW + (state.bezelSide || 5) * 2 + (state.wallThickness || 3) * 2;
+    const totalD = layoutD + (state.bezelTop || 5) + (state.bezelBottom || 8) + (state.wallThickness || 3) * 2;
+    const totalH = (state.bezelTop || 5) + (state.bezelBottom || 8) + (state.bottomThickness || 2.5) + (state.tiltAngle ? totalD * Math.sin((state.tiltAngle || 0) * Math.PI / 180) : 0);
+
+    const fitsW = totalW <= bed.w;
+    const fitsD = totalD <= bed.d;
+    const fitsH = totalH <= bed.h;
+    const fits = fitsW && fitsD && fitsH;
+
+    let splitSuggestion = null;
+    if (!fits) {
+        const splitW = Math.ceil(totalW / bed.w);
+        const splitD = Math.ceil(totalD / bed.d);
+        const totalParts = splitW * splitD;
+        splitSuggestion = {
+            partsW: splitW,
+            partsD: splitD,
+            totalParts,
+            partW: (totalW / splitW).toFixed(1),
+            partD: (totalD / splitD).toFixed(1),
+            joinerType: totalParts === 2 ? 'ダボ + ネジ' : '蟻継ぎ + ネジ'
+        };
+    }
+    return { bed, totalW, totalD, totalH, fits, fitsW, fitsD, fitsH, splitSuggestion };
+}
 function bodyAssistShowResult(html) {
     const el = document.getElementById('body-assist-result');
     if (!el) return;
@@ -3095,6 +3142,35 @@ function bindUI() {
             '後縁高さ / Rear Height: <b>' + g.rearH.toFixed(1) + ' mm</b><br>' +
             '実効タイピング角度 / Effective Typing Angle: ' + g.typingAngle.toFixed(1) + '°'
         );
+    });
+
+    // Phase 11: 分割ケース設計 — ベッドサイズに収まるかチェック + 推奨分割数提示
+    document.getElementById('body-split-check-btn')?.addEventListener('click', () => {
+        const sel = document.getElementById('body-split-printer');
+        const key = sel ? sel.value : 'bambu-x1';
+        const r = checkSplitCase(key);
+        const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+        let html = `<div style="font-weight:bold; margin-bottom:6px;">${r.bed.name} (${r.bed.w}×${r.bed.d}×${r.bed.h}mm)</div>`;
+        html += `<div style="margin-bottom:4px;">推定外寸: <strong>${r.totalW.toFixed(0)} × ${r.totalD.toFixed(0)} × ${r.totalH.toFixed(0)} mm</strong></div>`;
+        if (r.fits) {
+            html += `<div style="color:#69f0ae;">✅ ${isJa ? '一体出力可能' : 'Single piece OK'}</div>`;
+        } else {
+            const ng = [];
+            if (!r.fitsW) ng.push(`W (${r.totalW.toFixed(0)} > ${r.bed.w})`);
+            if (!r.fitsD) ng.push(`D (${r.totalD.toFixed(0)} > ${r.bed.d})`);
+            if (!r.fitsH) ng.push(`H (${r.totalH.toFixed(0)} > ${r.bed.h})`);
+            html += `<div style="color:#ff5252; margin-bottom:6px;">❌ ${isJa ? 'ベッドサイズ超過' : 'Exceeds bed'}: ${ng.join(' / ')}</div>`;
+            if (r.splitSuggestion) {
+                const s = r.splitSuggestion;
+                html += `<div style="padding:6px; background:rgba(255,183,77,0.08); border-left:3px solid #ffb74d; border-radius:3px;">`;
+                html += `<div style="font-weight:bold; color:#ffb74d;">${isJa ? '推奨分割' : 'Recommended split'}: ${s.partsW} × ${s.partsD} = ${s.totalParts} ${isJa ? 'パーツ' : 'parts'}</div>`;
+                html += `<div style="font-size:0.7rem; color:#ccc; margin-top:4px;">${isJa ? '1パーツあたり' : 'per part'}: ${s.partW} × ${s.partD} mm</div>`;
+                html += `<div style="font-size:0.7rem; color:#ccc;">${isJa ? '推奨ジョイント' : 'Suggested joint'}: ${s.joinerType}</div>`;
+                html += `<div style="font-size:0.66rem; color:#888; margin-top:4px;">※ 実際の分割ジオメトリ生成は Phase 12+。現状は判定のみ。</div>`;
+                html += `</div>`;
+            }
+        }
+        bodyAssistShowResult(html);
     });
 
     // 8. Variation generator

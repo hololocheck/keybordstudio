@@ -6530,6 +6530,30 @@
             }
         }
 
+        /* Phase 11: タブレット (≤1024px) で Layout レイヤーパネルをオーバーレイ化 */
+        @media (max-width: 1024px) {
+            #layout-layers-panel {
+                top: 0 !important;
+                bottom: 0 !important;
+                right: 0 !important;
+                width: min(80vw, 320px) !important;
+                border-radius: 0 !important;
+                border-left: 1px solid var(--accent);
+                box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
+                z-index: 50;
+            }
+            #layout-layers-panel.layers-open::before {
+                content: '';
+                position: fixed;
+                top: 0; left: 0;
+                width: calc(100vw - min(80vw, 320px));
+                height: 100%;
+                background: rgba(0, 0, 0, 0.45);
+                z-index: -1;
+                backdrop-filter: blur(2px);
+            }
+        }
+
     </style>
 
     <script src="https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js"></script>
@@ -25696,7 +25720,15 @@ ${mesh.triangles.join('\n')}
                         diffState[key] = state[key];
                     }
                 }
-                const json = JSON.stringify(diffState);
+                // Phase 11: 共有リンク強化 — メタ情報 (title / 主要パラメータ / タイムスタンプ) を併記
+                const meta = {
+                    t: (state.text || '').slice(0, 12),  // 表示用タイトル (主要キー文字)
+                    p: state.profile || 'cherry',
+                    s: state.uSize || 1.0,
+                    ts: Math.floor(Date.now() / 1000)
+                };
+                const payload = { _v: 2, s: diffState, m: meta };
+                const json = JSON.stringify(payload);
                 const compressed = LZString.compressToEncodedURIComponent(json);
                 const url = window.location.origin + window.location.pathname + '?s=' + compressed;
 
@@ -25713,6 +25745,24 @@ ${mesh.triangles.join('\n')}
                 showToast(currentLang === 'ja' ? 'エラーが発生しました' : 'An error occurred', true);
             }
         });
+
+        // Phase 11: 共有リンク用サムネイル取得関数 (X 共有や OG 風プレビューに使う)
+        // 直近の Three.js renderer canvas を 320×240 PNG dataURL で返す。
+        if (typeof window !== 'undefined') {
+            window._kbsGetShareThumbnail = function () {
+                try {
+                    const canvas = document.querySelector('#canvas-container canvas') || document.querySelector('#layout-canvas-container canvas');
+                    if (!canvas) return null;
+                    const tmp = document.createElement('canvas');
+                    tmp.width = 320; tmp.height = 240;
+                    const ctx = tmp.getContext('2d');
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(0, 0, 320, 240);
+                    ctx.drawImage(canvas, 0, 0, 320, 240);
+                    return tmp.toDataURL('image/png');
+                } catch (e) { return null; }
+            };
+        }
 
         document.getElementById('btn-share-x').addEventListener('click', () => {
             try {
@@ -25776,7 +25826,9 @@ ${shareUrl}
                     const encoded = url.searchParams.get('s');
                     if (encoded) {
                         const json = LZString.decompressFromEncodedURIComponent(encoded);
-                        const data = JSON.parse(json);
+                        let data = JSON.parse(json);
+                        // Phase 11: 共有リンク v2 形式 {_v:2, s:state, m:meta} を旧形式に変換
+                        if (data && data._v === 2 && data.s) data = data.s;
 
                         const presetName = 'URL_' + (Date.now() + idx);
                         loadedPresets.push({ name: presetName, data: { ...initialState, ...data }, version: 'V64' });
@@ -25806,7 +25858,9 @@ ${shareUrl}
                 const encoded = urlParams.get('s');
                 if (encoded) {
                     const json = LZString.decompressFromEncodedURIComponent(encoded);
-                    const data = JSON.parse(json);
+                    let data = JSON.parse(json);
+                    // Phase 11: v2 形式 {_v:2, s:state, m:meta}
+                    if (data && data._v === 2 && data.s) data = data.s;
                     Object.assign(state, data);
                     syncUI();
                     updateCustomDropdown();
@@ -31449,6 +31503,64 @@ ${triangles.join('\n')}
         document.getElementById('module-select')?.addEventListener('change', (e) => {
             switchModule(e.target.value);
         });
+
+        // Phase 11: Cross-Studio 依存関係チェック + 一括再生成
+        // Layout Studio で配列が変わると、Body の customLayoutData が古い可能性がある。
+        // 切替時に依存関係をチェックして警告し、ユーザーが望めば一括で再計算する。
+        (function () {
+            let _lastLayoutSig = null;
+            function _layoutSignature() {
+                try {
+                    if (!window._layoutModule || typeof window._layoutModule.getState !== 'function') return null;
+                    const st = window._layoutModule.getState();
+                    if (!st) return null;
+                    return [
+                        st.activePreset || '',
+                        Array.isArray(st.symbols) ? st.symbols.length : 0,
+                        Array.isArray(st.cadLines) ? st.cadLines.length : 0,
+                        st.gridSize || 0
+                    ].join('|');
+                } catch (e) { return null; }
+            }
+            function checkLayoutDependencies() {
+                const sig = _layoutSignature();
+                if (sig === null) return;
+                if (_lastLayoutSig !== null && sig !== _lastLayoutSig) {
+                    // Body 側の customLayoutData がある or layout-derived state を使っている場合に警告
+                    if (window._bodyModule && typeof window._bodyModule.getState === 'function') {
+                        const bs = window._bodyModule.getState();
+                        if (bs && bs.customLayoutData) {
+                            const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                            if (typeof showToast === 'function') {
+                                showToast(isJa ? 'レイアウトが変更されました。Body のレイアウトを再生成してください' : 'Layout changed. Please regenerate Body layout.');
+                            }
+                        }
+                    }
+                }
+                _lastLayoutSig = sig;
+            }
+            function bulkRegenerate() {
+                const isJa = (typeof currentLang !== 'undefined' && currentLang === 'ja');
+                if (!confirm(isJa ? '現在のレイアウト/設定を反映して、Body と Keycap を再生成します。実行しますか？' : 'Regenerate Body and Keycap with current layout/state. Proceed?')) return;
+                let count = 0;
+                try {
+                    if (typeof requestUpdate === 'function') { requestUpdate(); count++; }
+                    if (window._bodyModule && typeof window._bodyModule.updateModel === 'function') { window._bodyModule.updateModel(); count++; }
+                    if (window._layoutModule && typeof window._layoutModule.drawCanvas === 'function') { window._layoutModule.drawCanvas(); count++; }
+                } catch (e) { console.warn('Bulk regenerate error:', e); }
+                if (typeof showToast === 'function') showToast(isJa ? `${count} モジュールを再生成しました` : `Regenerated ${count} modules`);
+            }
+            // モジュール切替時に依存関係チェック
+            const origModuleSelect = document.getElementById('module-select');
+            if (origModuleSelect) origModuleSelect.addEventListener('change', () => setTimeout(checkLayoutDependencies, 200));
+            // 公開 API
+            if (typeof window !== 'undefined') {
+                window._kbsCheckDependencies = checkLayoutDependencies;
+                window._kbsBulkRegenerate = bulkRegenerate;
+            }
+            // 初期記録
+            setTimeout(() => { _lastLayoutSig = _layoutSignature(); }, 1500);
+        })();
 
         init();
     </script>

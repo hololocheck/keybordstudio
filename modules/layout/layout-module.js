@@ -21,15 +21,28 @@ const SECTION_OPTIONS = [
 const PX_PER_MM = 2; // 1mm = 2 world units
 
 const LAYOUT_PRESETS = {
-    '60':    { label: '60%',   totalW: 15,    totalH: 5 },
-    '65':    { label: '65%',   totalW: 16,    totalH: 5 },
-    '75':    { label: '75%',   totalW: 16,    totalH: 6 },
-    'tkl':   { label: 'TKL',   totalW: 18.5,  totalH: 6.5 },
-    'full':  { label: 'Full',  totalW: 22.75, totalH: 6.5 },
-    '40':    { label: '40%',   totalW: 12,    totalH: 4 },
-    'alice': { label: 'Alice', totalW: 15,    totalH: 5 },
-    'macro': { label: 'Macro', totalW: 3,     totalH: 3 },
-    '1800':  { label: '1800',  totalW: 20,    totalH: 6.5 },
+    '60':       { label: '60%',       totalW: 15,    totalH: 5 },
+    '65':       { label: '65%',       totalW: 16,    totalH: 5 },
+    '75':       { label: '75%',       totalW: 16,    totalH: 6 },
+    'tkl':      { label: 'TKL',       totalW: 18.5,  totalH: 6.5 },
+    'full':     { label: 'Full',      totalW: 22.75, totalH: 6.5 },
+    '40':       { label: '40%',       totalW: 12,    totalH: 4 },
+    'alice':    { label: 'Alice',     totalW: 15,    totalH: 5 },
+    'macro':    { label: 'Macro',     totalW: 3,     totalH: 3 },
+    '1800':     { label: '1800',      totalW: 20,    totalH: 6.5 },
+    // Phase 11: テンプレートギャラリー拡充
+    '30':       { label: '30%',       totalW: 10,    totalH: 3 },
+    '50':       { label: '50%',       totalW: 13,    totalH: 4 },
+    '70':       { label: '70%',       totalW: 17.25, totalH: 5 },
+    '96':       { label: '96%',       totalW: 19,    totalH: 6.5 },
+    'split-50': { label: 'Split 50%', totalW: 7,     totalH: 4 },     // 片側のみ
+    'ortho-44': { label: 'Ortho 4×12', totalW: 12,   totalH: 4 },
+    'ortho-60': { label: 'Ortho 5×12', totalW: 12,   totalH: 5 },
+    'planck':   { label: 'Planck',    totalW: 12,    totalH: 4 },
+    'preonic':  { label: 'Preonic',   totalW: 12,    totalH: 5 },
+    'numpad':   { label: 'Numpad',    totalW: 4,     totalH: 5 },
+    'corne':    { label: 'Corne',     totalW: 6,     totalH: 4 },     // 片側のみ
+    'lily58':   { label: 'Lily58',    totalW: 6,     totalH: 5 },     // 片側のみ
 };
 
 function getStabSpacing(wU) {

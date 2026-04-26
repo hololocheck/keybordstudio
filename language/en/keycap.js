@@ -52,13 +52,8 @@ export const keycapEn = {
     // SVG Settings
     h_svg: "SVG Icon Settings", btn_upload_svg: "Load SVG", btn_svg_manager: "Open SVG Manager", cat_custom: "Custom", lbl_visible: "Visible",
 
-    // Workflow guide (Phase 6-1)
-    wf_step_layout: "Layout",
-    wf_step_body: "Body",
-    wf_step_keycap: "Keycap",
-    wf_step_export: "Export",
-    qa_save: "Quick save", qa_export: "Export", qa_preflight: "Pre-flight",
-    lbl_advanced_mode: "Advanced mode",
+    // (Phase 11 cleanup: workflow_guide / advanced_mode / qa_* keys removed
+    //  — UI elements were deleted in 10ff1e2)
 
     // Cross-section view
     h_cross_section: "Cross-Section View",
@@ -427,12 +422,6 @@ export const keycapEn = {
     btn_profile_compare: "Compare profiles", btn_stem_strength: "Stem strength check", btn_clearance_check: "Press clearance check",
     lbl_row_batch: "Row generator",
     btn_theme_save: "Save current as theme", btn_theme_load: "Theme list",
-    lbl_safe_area: "Show top safe area", btn_print_sheet: "1:1 print sheet (SVG)",
-
-    // Phase 10+ Common Tools
-    tools_title: "Tools",
-    tool_screenshot: "📷 Screenshot (PNG)",
-    tool_cost: "💰 Cost estimate",
-    tool_diagnostic: "🔧 Diagnostics",
-    tool_history: "📜 History list"
+    lbl_safe_area: "Show top safe area", btn_print_sheet: "1:1 print sheet (SVG)"
+    // (Phase 11 cleanup: tools_* / tool_* keys removed — Quick Action Bar deleted)
 };

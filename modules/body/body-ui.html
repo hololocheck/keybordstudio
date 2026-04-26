@@ -617,6 +617,23 @@
         <button class="btn-small body-assist-var-btn" data-variation="wedge" data-i18n="body_btn_var_wedge">Wedge</button>
         <button class="btn-small body-assist-var-btn" data-variation="floating" data-i18n="body_btn_var_floating">Float</button>
     </div>
+
+    <!-- Phase 11: 分割ケース設計 -->
+    <label style="margin-top:10px;" data-i18n="body_lbl_split_case">分割ケース設計 (Bed-size check)</label>
+    <div class="control-row" style="gap:4px;">
+        <select id="body-split-printer" style="background:rgba(0,0,0,0.6); border:1px solid #444; color:#fff; padding:4px; flex:1; font-size:0.8rem; border-radius:3px;">
+            <option value="bambu-x1">Bambu X1/P1 (256³)</option>
+            <option value="bambu-a1">Bambu A1 (256³)</option>
+            <option value="bambu-a1m">Bambu A1 mini (180³)</option>
+            <option value="prusa-mk4">Prusa MK4 (250×210×220)</option>
+            <option value="prusa-xl">Prusa XL (360³)</option>
+            <option value="creality-k1">Creality K1 (220³ /250H)</option>
+            <option value="creality-k2">Creality K2 Plus (350³)</option>
+            <option value="voron-2.4-300">Voron 2.4 (300³)</option>
+            <option value="voron-2.4-350">Voron 2.4 (350³)</option>
+        </select>
+        <button id="body-split-check-btn" class="btn-small secondary" style="border-color:#26c6da; color:#26c6da;" data-i18n="body_btn_split_check">分割判定</button>
+    </div>
 </div>
 
 <!-- Inline result panel -->
