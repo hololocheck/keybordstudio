@@ -6458,6 +6458,51 @@
         }
 
         /* ===========================================================
+         * Phase 6-2: Advanced Mode Toggle
+         * 基本/詳細モード — 上級者向けのセクション (画像テクスチャ・Utility・
+         * 外部モデル・断面ビュー) を OFF 時に折りたたむ。
+         * =========================================================== */
+        #advanced-mode-row {
+            padding: 4px 0;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .adv-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 6px;
+            font-size: 0.72rem;
+            color: #888;
+        }
+        .adv-toggle input { display: none; }
+        .adv-track {
+            width: 28px; height: 14px;
+            background: #2a2a3e;
+            border-radius: 7px;
+            position: relative;
+            transition: background 0.15s;
+            display: inline-block;
+        }
+        .adv-thumb {
+            position: absolute;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #888;
+            top: 2px; left: 2px;
+            transition: all 0.15s;
+        }
+        .adv-toggle input:checked + .adv-track { background: var(--accent); }
+        .adv-toggle input:checked + .adv-track .adv-thumb {
+            left: 16px;
+            background: #fff;
+            box-shadow: 0 0 4px rgba(0,229,255,0.5);
+        }
+        .adv-toggle input:checked ~ .adv-text { color: var(--accent); }
+
+        /* ===========================================================
          * Phase 6-1: Workflow Guide
          * 制作フロー誘導: Layout → Body → Keycap → Export
          * =========================================================== */
@@ -6603,6 +6648,59 @@
             #layout-canvas-container {
                 width: min(calc(100% - var(--sidebar-width)), 2800px);
             }
+        }
+
+        /* ===========================================================
+         * Phase 6-3: Quick Action Bar
+         * 3 Studio 共通: Keycap/Body/Layout どこからでも同じ位置で
+         * クイック保存 (.kbsproj) / 現モジュール出力 / 製造前チェック にアクセス。
+         * =========================================================== */
+        #qa-bar {
+            position: fixed; bottom: 20px; right: 20px;
+            display: flex; flex-direction: column; gap: 8px;
+            padding: 8px;
+            background: rgba(15, 15, 25, 0.78);
+            border: 1px solid rgba(0, 229, 255, 0.35);
+            border-radius: 30px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+        }
+        .qa-button {
+            width: 44px; height: 44px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 50%;
+            color: #b2ebf2;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            padding: 0;
+        }
+        .qa-button:hover {
+            background: rgba(0, 229, 255, 0.18);
+            border-color: var(--accent);
+            color: #fff;
+            transform: scale(1.06);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+        }
+        .qa-button.qa-primary {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(76, 175, 80, 0.18));
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .qa-button.qa-primary:hover {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.4), rgba(76, 175, 80, 0.3));
+        }
+        @media (max-width: 1024px) {
+            #qa-bar { bottom: 12px; right: 12px; gap: 6px; padding: 6px; }
+            .qa-button { width: 38px; height: 38px; }
+            .qa-button svg { width: 18px; height: 18px; }
+        }
+        @media (max-width: 768px) {
+            /* mobile-bottom-nav と被らないよう持ち上げ + 横並び */
+            #qa-bar { bottom: 70px; right: 8px; gap: 4px; padding: 5px; flex-direction: row; }
+            .qa-button { width: 34px; height: 34px; }
         }
     </style>
 
@@ -8223,6 +8321,14 @@
                         <option value="layout" data-i18n="mod_layout">📐 Layout Studio</option>
                     </select>
                 </div>
+                <!-- Phase 6-2: 基本 / 詳細モード切替 -->
+                <div class="nav-row" id="advanced-mode-row">
+                    <label class="adv-toggle" data-hint="hint_advanced_mode">
+                        <input type="checkbox" id="advanced-mode-toggle">
+                        <span class="adv-track"><span class="adv-thumb"></span></span>
+                        <span class="adv-text" data-i18n="lbl_advanced_mode">詳細モード</span>
+                    </label>
+                </div>
                 <div class="nav-row"><select id="section-select">
                         <option value="" data-i18n="nav_jump">--- Jump to Section ---</option>
                         <option value="sec-basic" data-i18n="nav_basic">Basic Size</option>
@@ -8656,7 +8762,7 @@
                         </label>
                     </div>
 
-                    <h3 id="sec-texture" data-i18n="h_texture_map" style="color:#00e5ff; border-color:#00e5ff;">画像テクスチャ
+                    <h3 id="sec-texture" data-mode="advanced" data-i18n="h_texture_map" style="color:#00e5ff; border-color:#00e5ff;">画像テクスチャ
                         (Image Map)</h3>
                     <div class="v63-texture-map-panel">
                         <div class="file-upload" data-hint="hint_img_upload"><label for="img-texture-input"
@@ -8767,7 +8873,7 @@
                     </div>
 
                     <div class="section-sep"></div>
-                    <h3 id="sec-utility" style="color:#00e5ff;">Utility</h3>
+                    <h3 id="sec-utility" data-mode="advanced" style="color:#00e5ff;">Utility</h3>
                     <div class="control-group" style="display:flex; gap:5px; align-items:center;">
                         <button id="btn-random" class="accent" style="border-color:#e040fb; color:#e040fb; flex:1;"
                             data-hint="hint_randomizer">Randomizer</button>
@@ -8777,7 +8883,7 @@
 
                     <input type="checkbox" id="show-dimensions" style="display:none;">
 
-                    <h3 id="sec-import" style="color:#00e5ff; margin-top:10px; border-bottom:1px solid #00e5ff;"
+                    <h3 id="sec-import" data-mode="advanced" style="color:#00e5ff; margin-top:10px; border-bottom:1px solid #00e5ff;"
                         data-i18n="h_import">外部モデル (Import 3D)</h3>
                     <div class="v60-import-panel">
                         <div class="control-group" style="display:flex; gap:5px; align-items: flex-end;">
@@ -9089,7 +9195,7 @@
                         </div>
                     </div>
 
-                    <h3 id="sec-cross-section" data-i18n="h_cross_section">断面ビュー</h3>
+                    <h3 id="sec-cross-section" data-mode="advanced" data-i18n="h_cross_section">断面ビュー</h3>
                     <div class="control-group" data-hint="hint_cross_section">
                         <label class="toggle-switch"><input type="checkbox" id="cross-section-enabled" class="toggle-input"><span class="toggle-knob"></span><span class="toggle-label" data-i18n="lbl_enable_cross_section">断面を表示</span></label>
                         <div class="control-row" style="margin-top:6px;">
@@ -32243,7 +32349,95 @@ ${triangles.join('\n')}
             });
             if (typeof window !== 'undefined') window._showPreflight = showPreflight;
         })();
+
+        // Phase 6-3: Quick Action Bar
+        (function () {
+            function _bindQa(id, action) {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('click', action);
+            }
+            _bindQa('qa-quick-save', () => {
+                const saveBtn = document.getElementById('btn-env-export');
+                if (saveBtn) saveBtn.click();
+            });
+            _bindQa('qa-quick-export', () => {
+                const cur = (typeof currentModule !== 'undefined') ? currentModule : 'keycap';
+                try {
+                    if (cur === 'body' && window._bodyModule && typeof window._bodyModule.showBodyExportDialog === 'function') {
+                        window._bodyModule.showBodyExportDialog();
+                    } else if (cur === 'layout' && window._layoutModule && typeof window._layoutModule.openExportDialog === 'function') {
+                        window._layoutModule.openExportDialog();
+                    } else {
+                        const exp = document.getElementById('btn-export-single');
+                        if (exp) exp.click();
+                    }
+                    try { localStorage.setItem('kbs_last_export_at', String(Date.now())); } catch (e) { /* ignore */ }
+                    if (typeof window._refreshWorkflowGuide === 'function') window._refreshWorkflowGuide();
+                } catch (err) {
+                    console.warn('Quick export failed:', err);
+                }
+            });
+            _bindQa('qa-preflight', () => {
+                const pf = document.getElementById('btn-preflight-check');
+                if (pf) pf.click();
+            });
+        })();
+
+        // Phase 6-2: 基本/詳細モード
+        // h3[data-mode="advanced"] とその「次の h3 まで」の兄弟要素を一括で hide/show する。
+        // ユーザーの選択は localStorage に保存し、リロード後も維持する。
+        (function () {
+            const ADV_KEY = 'kbs_advanced_mode';
+            function applyAdvancedMode(enabled) {
+                document.body.classList.toggle('advanced-mode', enabled);
+                const headers = document.querySelectorAll('h3[data-mode="advanced"]');
+                headers.forEach(h => {
+                    if (enabled) h.style.removeProperty('display');
+                    else h.style.display = 'none';
+                    let cur = h.nextElementSibling;
+                    while (cur && cur.tagName !== 'H3') {
+                        if (enabled) {
+                            if (cur.dataset._wasAdv === '1') {
+                                cur.style.removeProperty('display');
+                                delete cur.dataset._wasAdv;
+                            }
+                        } else {
+                            if (cur.style.display !== 'none') {
+                                cur.dataset._wasAdv = '1';
+                                cur.style.display = 'none';
+                            }
+                        }
+                        cur = cur.nextElementSibling;
+                    }
+                });
+            }
+            const advToggle = document.getElementById('advanced-mode-toggle');
+            if (advToggle) {
+                let saved = '0';
+                try { saved = localStorage.getItem(ADV_KEY) || '0'; } catch (e) { /* ignore */ }
+                advToggle.checked = saved === '1';
+                applyAdvancedMode(advToggle.checked);
+                advToggle.addEventListener('change', () => {
+                    applyAdvancedMode(advToggle.checked);
+                    try { localStorage.setItem(ADV_KEY, advToggle.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+                });
+            }
+        })();
     </script>
+
+    <!-- Phase 6-3: Quick Action Bar (3 Studio 共通の保存/出力/チェック) -->
+    <div id="qa-bar" data-hint="hint_qa_bar">
+        <button id="qa-quick-save" class="qa-button" title="Quick save (.kbsproj)" aria-label="Quick save">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/></svg>
+        </button>
+        <button id="qa-quick-export" class="qa-button qa-primary" title="Export current module" aria-label="Export">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        </button>
+        <button id="qa-preflight" class="qa-button" title="Pre-flight check" aria-label="Pre-flight">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+        </button>
+    </div>
 
 </body>
 

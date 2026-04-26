@@ -57,6 +57,8 @@ export const keycapEn = {
     wf_step_body: "Body",
     wf_step_keycap: "Keycap",
     wf_step_export: "Export",
+    qa_save: "Quick save", qa_export: "Export", qa_preflight: "Pre-flight",
+    lbl_advanced_mode: "Advanced mode",
 
     // Cross-section view
     h_cross_section: "Cross-Section View",

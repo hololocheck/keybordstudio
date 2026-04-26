@@ -58,6 +58,8 @@ export const keycapJa = {
     wf_step_body: "ボディ",
     wf_step_keycap: "キーキャップ",
     wf_step_export: "出力",
+    qa_save: "クイック保存", qa_export: "出力", qa_preflight: "製造前チェック",
+    lbl_advanced_mode: "詳細モード",
 
     // 断面ビュー
     h_cross_section: "断面ビュー",
