@@ -65,9 +65,6 @@ export const keycapEn = {
     opt_axis_z: "Z axis (depth)",
     cross_section_note: "* Display only — does not affect STL/3MF export.",
 
-    // Pre-flight check
-    h_preflight: "Pre-flight Checklist",
-    btn_preflight: "Pre-flight check",
     btn_close: "Close",
 
     // Strap Hole
@@ -414,17 +411,39 @@ export const keycapEn = {
     mobile_gumball: "Gumball",
     mobile_export: "Export",
 
-    // Phase 9 Keycap Assist
-    h_keycap_assist: "Assist Tools",
-    lbl_material_preset: "Material preset", btn_apply_material: "Apply",
-    lbl_engrave_preset: "Engrave depth preset",
-    opt_engrave_fdm: "FDM (deep)", opt_engrave_resin: "Resin (shallow)", opt_engrave_laser: "Laser (very shallow)", opt_engrave_inlay: "Inlay (deep)",
-    btn_profile_compare: "Compare profiles", btn_stem_strength: "Stem strength check", btn_clearance_check: "Press clearance check",
-    lbl_row_batch: "Row generator",
-    // (theme buttons removed in Phase 14)
-    lbl_keyset_view: "Keyset view (whole keyboard)",
-    btn_keyset_export: "Bulk STL export",
-    keyset_note: "* All keys use the current profile/color settings. Labels come from the layout. To edit individual keys, turn keyset view OFF.",
-    lbl_safe_area: "Show top safe area", btn_print_sheet: "1:1 print sheet (SVG)"
-    // (Phase 11 cleanup: tools_* / tool_* keys removed — Quick Action Bar deleted)
+    // Stem strength FEA
+    h_stem_fea: "Stem Strength Analysis",
+    nav_stem_fea: "Stem strength",
+    stem_fea_intro: "Beam-theory structural analysis: pull-off / press / side-load / insertion hoop / layer adhesion stress + safety factors.",
+    lbl_stem_fea_material: "Material",
+    lbl_stem_fea_load: "Load profile",
+    load_normal: "Normal typing",
+    load_gaming: "Gaming (rapid)",
+    load_extreme: "Extreme (drop)",
+    btn_stem_fea_run: "⚙ Run analysis",
+
+    // Keyset View (bulk keyboard generation)
+    h_keyset_view: "Keyset View",
+    nav_keyset_view: "Keyset View",
+    lbl_keyset_view: "Enable keyset view",
+    lbl_keyset_layout: "Layout",
+    keyset_intro: "Generate the whole keyboard at once. Sliders for size / shape / color / text mode apply to every keycap simultaneously. Labels are auto-filled from the layout definition. Edit individual labels via the text-placement dialog.",
+    keyset_export_note: "* Use the regular Export button. What you see is what gets exported.",
+    btn_keyset_customize: "✎ Open text-placement dialog",
+    // Text-placement dialog
+    keyset_dlg_title: "Text Placement — Keyset View",
+    keyset_dlg_text_mode: "Text mode (bulk)",
+    keyset_dlg_font: "Font (bulk)",
+    keyset_dlg_reset: "⟲ Reset labels",
+    keyset_dlg_edit_label: "Text on this key",
+    keyset_dlg_apply: "Apply",
+    keyset_dlg_revert: "Default",
+    keyset_dlg_cancel: "✕",
+    keyset_dlg_close: "Close",
+    keyset_dlg_hint: "Click a key to edit. Changes apply to the 3D view immediately.",
+    text_mode_emboss: "Emboss",
+    text_mode_engrave: "Engrave",
+    text_mode_cutout: "Cutout",
+    text_mode_inset: "Inset",
+    text_mode_doubleshot: "Doubleshot"
 };

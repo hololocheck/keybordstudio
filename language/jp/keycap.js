@@ -66,9 +66,6 @@ export const keycapJa = {
     opt_axis_z: "Z 軸 (奥行き)",
     cross_section_note: "※ 表示専用機能です。STL/3MF 出力には影響しません。",
 
-    // 製造前チェック
-    h_preflight: "製造前チェックリスト",
-    btn_preflight: "製造前チェック",
     btn_close: "閉じる",
 
     // ストラップ穴
@@ -415,17 +412,39 @@ export const keycapJa = {
     mobile_gumball: "ガムボール",
     mobile_export: "出力",
 
-    // Phase 9 Keycap アシスト
-    h_keycap_assist: "アシスト機能",
-    lbl_material_preset: "素材プリセット", btn_apply_material: "適用",
-    lbl_engrave_preset: "文字彫刻プリセット",
-    opt_engrave_fdm: "FDM 向け", opt_engrave_resin: "レジン向け", opt_engrave_laser: "レーザー風", opt_engrave_inlay: "インレイ向け",
-    btn_profile_compare: "プロファイル比較", btn_stem_strength: "ステム強度チェック", btn_clearance_check: "押下クリアランス検査",
-    lbl_row_batch: "行別一括生成",
-    // (テーマ保存/読込ボタンは Phase 14 で削除)
-    lbl_keyset_view: "配列ビュー (キーボード全体)",
-    btn_keyset_export: "一括 STL 出力",
-    keyset_note: "※ 配列ビュー時は現在のプロファイル/色設定を全キーに適用。ラベルは配列定義から。個別キー編集は配列ビューを OFF に。",
-    lbl_safe_area: "トップ面安全領域を表示", btn_print_sheet: "実寸チェックシート (SVG)"
-    // (Phase 11 cleanup: tools_* / tool_* キー削除 — Quick Action Bar 撤去)
+    // ステム強度解析 (構造計算)
+    h_stem_fea: "ステム強度解析",
+    nav_stem_fea: "ステム強度解析",
+    stem_fea_intro: "梁理論ベースの構造解析で引抜き / 押下 / 横荷重 / 装着時膨張 / 層間接着 の応力と安全率を算出します。",
+    lbl_stem_fea_material: "素材",
+    lbl_stem_fea_load: "荷重プロファイル",
+    load_normal: "通常タイピング",
+    load_gaming: "ゲーミング (連打)",
+    load_extreme: "エクストリーム (落下)",
+    btn_stem_fea_run: "⚙ 構造解析を実行",
+
+    // 配列ビュー (キーボード一括生成)
+    h_keyset_view: "配列ビュー",
+    nav_keyset_view: "配列ビュー",
+    lbl_keyset_view: "配列ビューを有効化",
+    lbl_keyset_layout: "レイアウト",
+    keyset_intro: "キーボード全体を一括生成するモード。基本サイズ・形状・色・テキストモードのスライダーが全キーに同時適用されます。ラベルは配列定義から自動入力。個別の文字編集は「文字配置ダイアログ」で行います。",
+    keyset_export_note: "※ エクスポート時は通常のエクスポートボタンから。現在表示している配列がそのまま出力されます。",
+    btn_keyset_customize: "✎ 文字配置ダイアログを開く",
+    // 文字配置ダイアログ
+    keyset_dlg_title: "文字配置 — 配列ビュー",
+    keyset_dlg_text_mode: "テキストモード (一括)",
+    keyset_dlg_font: "フォント (一括)",
+    keyset_dlg_reset: "⟲ ラベル初期化",
+    keyset_dlg_edit_label: "このキーの文字",
+    keyset_dlg_apply: "適用",
+    keyset_dlg_revert: "既定値",
+    keyset_dlg_cancel: "✕",
+    keyset_dlg_close: "閉じる",
+    keyset_dlg_hint: "キーをクリックして文字を編集。設定は即時 3D に反映されます。",
+    text_mode_emboss: "浮き出し (Emboss)",
+    text_mode_engrave: "掘り込み (Engrave)",
+    text_mode_cutout: "切り抜き (Cutout)",
+    text_mode_inset: "埋め込み (Inset)",
+    text_mode_doubleshot: "ダブルショット"
 };
